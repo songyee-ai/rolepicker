@@ -13,6 +13,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   Avatar,
+  BackLink,
   Button,
   ButtonLink,
   Notice,
@@ -91,7 +92,10 @@ export default function ResultScreen({ team }: { team: TeamView & { today: Assig
 
   return (
     <Screen>
-      <TopBar left={formatKstDateLabel(assignment.date)} />
+      <TopBar
+        left={<BackLink href="/">조 다시 선택</BackLink>}
+        right={<span>{formatKstDateLabel(assignment.date)}</span>}
+      />
       <Title>오늘의 역할</Title>
 
       {assignment.assigned.map((entry) => (
@@ -128,8 +132,13 @@ export default function ResultScreen({ team }: { team: TeamView & { today: Assig
           <RoleLabel tone="rule">
             {role.emoji} {role.name}
           </RoleLabel>
+          {/*
+            비는 이유가 두 가지다. 참여 인원이 역할 수보다 적었거나 (PRD §7),
+            뽑은 뒤에 그 역할을 맡은 그루가 명단에서 내려갔거나.
+            원인을 단정하지 않고 다음 행동을 권한다 (PRD §17).
+          */}
           <p className="mt-[5px] text-[12px] font-light text-ink-35">
-            참여 인원이 적어서 오늘은 비워뒀어요.
+            아직 정해지지 않았어요. 다시 뽑으면 채워져요.
           </p>
         </section>
       ))}

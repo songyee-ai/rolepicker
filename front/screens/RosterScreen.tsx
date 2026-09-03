@@ -1,20 +1,31 @@
 'use client';
 
 /**
- * S3. 조원 확인 — /t/[slug] (PRD §6 S3)
+ * S3. 조원 확인 (PRD §6 S3)
  *
- * 오늘 배정이 이미 있으면 이 화면은 뜨지 않는다. 서버가 결과 화면으로 보낸다.
+ * 두 가지 상태가 있다.
+ *
+ * (1) 오늘 아직 안 뽑았다 — 참여/빈자리를 정하고 `역할 뽑기`
+ * (2) 오늘 이미 뽑았다 — 이 화면은 채팅방 링크로는 뜨지 않는다.
+ *     링크(`/t/[slug]`)를 열면 결과로 바로 간다 (PRD §6 S3).
+ *     최근 목록에서 들어오거나 명단을 고치고 저장했을 때만 이 상태로 온다.
+ *     주 버튼은 `오늘 결과 보기`이고, 빈자리를 고치면 그때 주 버튼이
+ *     `다시 뽑기`로 바뀐다. 무심코 눌러서 남의 결과를 덮어쓰지 않게 하려는 것이다
+ *     (PRD §16 — 조원 전원이 같은 결과를 본다).
  */
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Avatar,
+  BackLink,
   BlockedHint,
   Button,
+  ButtonLink,
   CountRow,
   Notice,
+  RoleLabel,
   Screen,
   StickyFooter,
   StickyHeader,
@@ -30,19 +41,34 @@ import type { TeamView } from '@/shared/types';
 /** 참여가 2명 미만이면 뽑을 수 없다 (PRD §6 S3) */
 const MIN_PRESENT = 2;
 
+const keyOf = (ids: Iterable<string>) => [...ids].sort().join(',');
+
 export default function RosterScreen({ team }: { team: TeamView }) {
   const router = useRouter();
+  const drawn = team.today;
 
-  // 처음에는 전원 참여. 빈자리는 눌러서 표시한다
-  const [present, setPresent] = useState<Set<string>>(
-    () => new Set(team.members.map((member) => member.id)),
+  /**
+   * 이미 뽑은 날이면 그날의 참여 상태를 그대로 가져온다.
+   * 전원 참여로 초기화하면 화면이 오늘의 빈자리를 잊어버린다.
+   */
+  const baseline = useMemo(
+    () =>
+      drawn
+        ? [...drawn.assigned.map((entry) => entry.member.id), ...drawn.groos.map((m) => m.id)]
+        : team.members.map((member) => member.id),
+    [drawn, team.members],
   );
+
+  const [present, setPresent] = useState<Set<string>>(() => new Set(baseline));
   const [error, setError] = useState('');
-  const [drawing, setDrawing] = useState(false);
+  const [working, setWorking] = useState(false);
 
   const absent = team.members.filter((member) => !present.has(member.id));
   const presentCount = present.size;
   const canDraw = presentCount >= MIN_PRESENT;
+
+  /** 이미 뽑은 날에 빈자리를 건드렸는가 */
+  const touched = drawn !== null && keyOf(present) !== keyOf(baseline);
 
   function toggle(memberId: string) {
     setPresent((current) => {
@@ -59,9 +85,11 @@ export default function RosterScreen({ team }: { team: TeamView }) {
    */
   async function draw() {
     setError('');
-    setDrawing(true);
+    setWorking(true);
     try {
-      const assignment = await api.assign(team.slug, [...present]);
+      const assignment = drawn
+        ? await api.reroll(team.slug, [...present])
+        : await api.assign(team.slug, [...present]);
 
       rememberTeam({
         slug: team.slug,
@@ -73,18 +101,39 @@ export default function RosterScreen({ team }: { team: TeamView }) {
       router.push(`/t/${team.slug}/draw`);
     } catch (caught) {
       setError(messageOf(caught));
-      setDrawing(false);
+      setWorking(false);
     }
   }
 
+  const leadName = drawn?.assigned.find((entry) => entry.role.key === 'lead')?.member.name ?? null;
+
   return (
     <Screen>
-      <TopBar left={formatKstDateLabel(todayKst())} />
+      <TopBar
+        left={<BackLink href="/">조 다시 선택</BackLink>}
+        right={<span>{formatKstDateLabel(todayKst())}</span>}
+      />
 
       {/* 만든 날에만 링크 배너를 띄운다. 이후에는 '명단 고치기' 하단에 상시 노출된다 */}
       {team.createdToday ? <LinkBanner slug={team.slug} code={team.code} /> : null}
 
       <Title>오늘 함께할 그루</Title>
+
+      {/* 이미 뽑은 날이라는 것을 먼저 알린다 */}
+      {drawn ? (
+        <div className="mt-[10px] rounded-[12px] border border-rule bg-white px-[11px] py-[9px]">
+          <p className="text-[11px] font-medium text-ink-60">오늘은 이미 뽑았어요</p>
+          {leadName ? (
+            <p className="mt-[5px] flex items-center gap-[6px]">
+              <RoleLabel>🎯 이끄미</RoleLabel>
+              <span className="text-[13px] font-semibold">{leadName}</span>
+            </p>
+          ) : null}
+          <p className="mt-[6px] text-[10.5px] font-light leading-[1.5] text-ink-60">
+            빈자리가 달라졌으면 아래에서 고치고 다시 뽑을 수 있어요.
+          </p>
+        </div>
+      ) : null}
 
       <StickyHeader>
         <CountRow
@@ -111,11 +160,7 @@ export default function RosterScreen({ team }: { team: TeamView }) {
                 here ? 'border-rule bg-paper' : 'border-dashed border-[#D5D4CC] bg-transparent',
               ].join(' ')}
             >
-              <Avatar
-                initial={member.initial}
-                name={member.name}
-                tone={here ? 'lead' : 'add'}
-              />
+              <Avatar initial={member.initial} name={member.name} tone={here ? 'lead' : 'add'} />
               <span
                 className={[
                   'flex-1 text-[13px] font-medium',
@@ -130,9 +175,7 @@ export default function RosterScreen({ team }: { team: TeamView }) {
                 aria-pressed={here}
                 className={[
                   'flex-none rounded-[7px] border px-[7px] py-[3px] text-[10.5px] font-medium',
-                  here
-                    ? 'border-ink bg-ink text-white'
-                    : 'border-rule bg-white text-ink-60',
+                  here ? 'border-ink bg-ink text-white' : 'border-rule bg-white text-ink-60',
                 ].join(' ')}
               >
                 {here ? '참여' : '빈자리'}
@@ -154,15 +197,40 @@ export default function RosterScreen({ team }: { team: TeamView }) {
       </div>
 
       <StickyFooter>
-        {/* 회색으로만 만들지 말고 왜 못 누르는지 알린다 (PRD §14) */}
         {!canDraw ? (
+          /* 회색으로만 만들지 말고 왜 못 누르는지 알린다 (PRD §14) */
           <BlockedHint>
             참여가 {MIN_PRESENT}명부터 뽑을 수 있어요. 지금은 {presentCount}명이에요.
           </BlockedHint>
         ) : null}
-        <Button onClick={draw} disabled={!canDraw || drawing}>
-          {drawing ? '뽑고 있어요…' : '역할 뽑기'}
-        </Button>
+
+        {drawn === null ? (
+          <Button onClick={draw} disabled={!canDraw || working}>
+            {working ? '뽑고 있어요…' : '역할 뽑기'}
+          </Button>
+        ) : touched ? (
+          <>
+            {/* 빈자리를 고쳤으면 그걸 반영하는 버튼이 주 버튼이 된다 */}
+            <Button onClick={draw} disabled={!canDraw || working}>
+              {working ? '다시 뽑고 있어요…' : '빈자리 반영해서 다시 뽑기'}
+            </Button>
+            <ButtonLink href={`/t/${team.slug}`} tone="quiet" className="mt-[6px]">
+              고친 것 버리고 오늘 결과 보기
+            </ButtonLink>
+          </>
+        ) : (
+          <>
+            <ButtonLink href={`/t/${team.slug}`}>오늘 결과 보기</ButtonLink>
+            <Button
+              tone="quiet"
+              className="mt-[6px]"
+              onClick={draw}
+              disabled={!canDraw || working}
+            >
+              {working ? '다시 뽑고 있어요…' : '이대로 다시 뽑기'}
+            </Button>
+          </>
+        )}
       </StickyFooter>
     </Screen>
   );

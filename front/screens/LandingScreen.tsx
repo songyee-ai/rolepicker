@@ -50,7 +50,7 @@ export default function LandingScreen() {
     setEntering(true);
     try {
       const { slug } = await api.resolve(code);
-      router.push(`/t/${slug}`);
+      router.push(`/t/${slug}/check`);
     } catch (caught) {
       setError(messageOf(caught));
       setEntering(false);
@@ -79,7 +79,7 @@ export default function LandingScreen() {
             {recent.map((team, index) => (
               <li key={team.slug}>
                 <Link
-                  href={`/t/${team.slug}`}
+                  href={`/t/${team.slug}/check`}
                   className={[
                     'mb-[6px] flex items-center gap-[9px] rounded-[11px] bg-white px-[10px] py-[9px]',
                     index === 0 ? 'border-[1.5px] border-ink' : 'border border-rule',
@@ -183,7 +183,7 @@ export default function LandingScreen() {
       <div className="mt-auto pt-4">
         {hasRecent ? (
           <>
-            <ButtonLink href={`/t/${recent[0].slug}`}>
+            <ButtonLink href={`/t/${recent[0].slug}/check`}>
               {recent[0].lastLeadName ? `${recent[0].lastLeadName} 그루의 조 열기` : '최근 조 열기'}
             </ButtonLink>
             <ButtonLink href="/new" tone="quiet" className="mt-[6px]">

@@ -12,7 +12,7 @@ import { teamUrl } from '../slug';
 import { memberArray, stringArray } from '../validate';
 import { createTeam, loadRoles, loadMembers, requireTeamBySlug, toTeamView } from '../db/teams';
 import { saveMembers } from '../db/members';
-import { readAssignmentView } from '../db/assignments';
+import { readAssignmentView, reconcileAssignment } from '../db/assignments';
 import { todayKst } from '@/shared/date';
 import { MAX_MEMBERS } from '@/shared/names';
 import type { CreateTeamResponse, TeamView } from '@/shared/types';
@@ -64,7 +64,11 @@ export const putMembers = handler(
     const incoming = memberArray(body, MAX_NAME_INPUTS);
 
     const members = await saveMembers(team.id, incoming);
+
+    // 명단이 바뀌었으면 오늘 배정의 참여 기록도 따라가야 한다.
+    // 안 하면 새로 넣은 조원이 결과 화면의 어느 줄에도 나오지 않는다
     const today = todayKst();
+    await reconcileAssignment(team.id, today);
     const [roles, todayAssignment] = await Promise.all([
       loadRoles(team.id),
       readAssignmentView(team.id, today),

@@ -129,7 +129,9 @@ export default function EditMembersScreen({ team }: { team: TeamView }) {
           .map((row) => ({ id: row.id, name: cleanName(row.name) }))
           .filter((row) => row.name.length > 0),
       );
-      router.push(`/t/${team.slug}`);
+      // 결과 화면으로 바로 가면 새로 넣은 그루가 오늘 배정에 없어서
+      // 아무 일도 안 일어난 것처럼 보인다. 빈자리를 정하고 다시 뽑는 화면으로 보낸다
+      router.push(`/t/${team.slug}/check`);
     } catch (caught) {
       setError(messageOf(caught));
       setSaving(false);
@@ -142,7 +144,7 @@ export default function EditMembersScreen({ team }: { team: TeamView }) {
         left="명단 고치기"
         right={
           <Link href={`/t/${team.slug}`} className="text-[10px] text-ink-60">
-            오늘 화면으로
+            저장 안 하고 나가기
           </Link>
         }
       />

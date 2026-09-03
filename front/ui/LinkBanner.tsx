@@ -8,6 +8,7 @@
  */
 
 import { useState } from 'react';
+import { useOrigin } from '@/front/lib/use-origin';
 
 export default function LinkBanner({
   slug,
@@ -20,7 +21,9 @@ export default function LinkBanner({
   variant?: 'banner' | 'quiet';
 }) {
   const [copied, setCopied] = useState(false);
-  const url = typeof window === 'undefined' ? `/t/${slug}` : `${window.location.origin}/t/${slug}`;
+  const origin = useOrigin();
+  const path = `/t/${slug}`;
+  const url = origin ? origin + path : path;
 
   async function copy() {
     try {

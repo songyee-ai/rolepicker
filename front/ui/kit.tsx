@@ -38,12 +38,29 @@ export function Screen({
 }
 
 /** 화면 위쪽의 작은 안내줄. 목업의 status 자리 */
-export function TopBar({ left, right }: { left: string; right?: ReactNode }) {
+export function TopBar({ left, right }: { left: ReactNode; right?: ReactNode }) {
   return (
-    <div className="mb-3 flex items-center justify-between font-mono text-[10px] text-ink-35">
-      <span>{left}</span>
+    <div className="mb-3 flex items-center justify-between gap-2 font-mono text-[10px] text-ink-35">
+      <span className="min-w-0 truncate">{left}</span>
       {right}
     </div>
+  );
+}
+
+/**
+ * 되돌아갈 이유가 실제로 생기는 자리에만 명시적인 입구를 둔다 (목업 '화면 이동에 대해').
+ * 채팅방 링크로 바로 들어온 사람은 브라우저 뒤로 가기로 갈 곳이 없으므로,
+ * 조를 잘못 골랐을 때 첫 화면으로 가는 길이 눈에 보여야 한다.
+ */
+export function BackLink({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <Link
+      href={href}
+      className="flex items-center gap-[3px] font-sans text-[11px] font-medium text-ink-60"
+    >
+      <span aria-hidden>‹</span>
+      {children}
+    </Link>
   );
 }
 

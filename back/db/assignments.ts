@@ -320,6 +320,62 @@ export async function rerollAssignment(
   return buildView(touched as AssignmentRow, detail, context.members, context.roleRows);
 }
 
+/**
+ * 명단이 바뀐 뒤 오늘 배정을 명단과 맞춘다.
+ *
+ * 뽑은 뒤에 조원을 추가하면, 그 사람은 오늘 배정의 참여 기록에 없어서
+ * 결과 화면의 어느 줄에도 나오지 않는다. 그루도 아니고 빈자리도 아닌
+ * 상태가 되어 명단에 넣은 것이 사라진 것처럼 보인다.
+ *
+ * 그래서 명단을 저장할 때마다
+ *   - 새로 들어온 조원은 오늘 '빈자리'로 넣는다 (오늘 뽑기에는 없었으니까)
+ *   - 명단에서 내려간 조원은 오늘 기록에서 뺀다. 맡고 있던 역할은 빈 역할이 된다
+ * 지난 날짜는 건드리지 않는다. 히스토리는 그대로 남아야 한다 (PRD §3-6).
+ */
+export async function reconcileAssignment(teamId: string, date: DateStr): Promise<void> {
+  const row = await findAssignment(teamId, date);
+  if (!row) return;
+
+  const client = db();
+  const members = await loadMembers(teamId);
+  const activeIds = new Set(members.filter((member) => member.active).map((member) => member.id));
+
+  const detail = await loadDetail(row.id);
+  const recorded = new Set(detail.attendances.map((attendance) => attendance.member_id));
+
+  // 새로 들어온 조원 -> 오늘은 빈자리
+  const added = [...activeIds].filter((id) => !recorded.has(id));
+  if (added.length > 0) {
+    const { error } = await client.from('attendances').upsert(
+      added.map((memberId) => ({
+        assignment_id: row.id,
+        member_id: memberId,
+        present: false,
+      })),
+      { onConflict: 'assignment_id,member_id', ignoreDuplicates: true },
+    );
+    if (error) throw error;
+  }
+
+  // 명단에서 내려간 조원 -> 오늘 기록에서 제거
+  const dropped = [...recorded].filter((id) => !activeIds.has(id));
+  if (dropped.length > 0) {
+    const removeAttendances = await client
+      .from('attendances')
+      .delete()
+      .eq('assignment_id', row.id)
+      .in('member_id', dropped);
+    if (removeAttendances.error) throw removeAttendances.error;
+
+    const removeItems = await client
+      .from('assignment_items')
+      .delete()
+      .eq('assignment_id', row.id)
+      .in('member_id', dropped);
+    if (removeItems.error) throw removeItems.error;
+  }
+}
+
 /** 오늘 배정을 읽는다. 없으면 null */
 export async function readAssignmentView(
   teamId: string,
