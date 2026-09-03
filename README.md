@@ -36,8 +36,8 @@ Supabase는 아직 붙이지 않았다. `npm test`는 DB 없이 돌아간다.
 - [x] `back/slug.ts` — 링크 주소 발급
 - [x] `supabase/migrations/0001_init.sql` — 스키마 + RLS
 - [x] API 6개 (`docs/API.md`)
-- [ ] **Supabase 프로젝트 연결** ← `supabase/README.md` 참고
-- [ ] 화면 (S2 새 조 만들기 → S3 조원 확인 → S4 뽑는 순간 → S5 결과 → 명단 고치기)
+- [x] 화면 (S0 첫 화면 · S2 새 조 만들기 · S3 조원 확인 · S4 뽑는 순간 · S5 결과 · 명단 고치기)
+- [ ] **Supabase 프로젝트 연결** ← `supabase/README.md` 참고. 이것만 하면 M1 끝
 
 검사 116개.
 
