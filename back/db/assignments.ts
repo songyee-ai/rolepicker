@@ -453,5 +453,7 @@ function buildView(
     absent,
     unfilledRoles,
     updatedAt: row.updated_at,
+    // 타이머 상태는 back/load.ts 에서 붙인다. 배정 모듈은 타이머를 모른다
+    timer: null,
   };
 }

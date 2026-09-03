@@ -333,7 +333,7 @@ export default function TimerRunScreen({
             <Button tone="lime" onClick={() => void startNext(waitingKind)} disabled={busy}>
               {waitingKind === 'break' ? '쉬는시간 시작' : '학습 시작'}
             </Button>
-            <ButtonLink href={`/t/${team.slug}/timer`} tone="quiet-dark">
+            <ButtonLink href={`/t/${team.slug}/timer?edit=1`} tone="quiet-dark">
               시간 다시 정하기
             </ButtonLink>
           </>

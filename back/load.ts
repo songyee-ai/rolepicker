@@ -10,7 +10,7 @@ import 'server-only';
 import { isSupabaseConfigured } from './env';
 import { readAssignmentView } from './db/assignments';
 import { findTeamBySlug, loadMembers, loadRoles, toTeamView } from './db/teams';
-import { loadTimerState } from './db/timer';
+import { loadTimerState, loadTimerSummary } from './db/timer';
 import { todayKst } from '@/shared/date';
 import type { TeamView, TimerStateView } from '@/shared/types';
 
@@ -28,7 +28,18 @@ export async function loadTeamView(slug: string): Promise<TeamView | null> {
     readAssignmentView(team.id, today),
   ]);
 
-  return toTeamView(team, members, roles, today, todayAssignment);
+  const view = toTeamView(team, members, roles, today, todayAssignment);
+  return withTimerSummary(view);
+}
+
+/**
+ * 결과 화면이 '타이머가 돌고 있다'를 알 수 있게 붙여준다.
+ * 조원 한 명이 타이머를 켜면 다른 조원 화면의 버튼이 바뀐다.
+ */
+export async function withTimerSummary(view: TeamView): Promise<TeamView> {
+  if (!view.today) return view;
+  const timer = await loadTimerSummary(view.today.id);
+  return { ...view, today: { ...view.today, timer } };
 }
 
 /**

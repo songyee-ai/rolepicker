@@ -13,6 +13,7 @@ import { memberArray, stringArray } from '../validate';
 import { createTeam, loadRoles, loadMembers, requireTeamBySlug, toTeamView } from '../db/teams';
 import { saveMembers } from '../db/members';
 import { readAssignmentView, reconcileAssignment } from '../db/assignments';
+import { withTimerSummary } from '../load';
 import { todayKst } from '@/shared/date';
 import { MAX_MEMBERS } from '@/shared/names';
 import type { CreateTeamResponse, TeamView } from '@/shared/types';
@@ -50,7 +51,7 @@ export const getTeam = handler(
     ]);
 
     const view: TeamView = toTeamView(team, members, roles, today, todayAssignment);
-    return jsonOk(view);
+    return jsonOk(await withTimerSummary(view));
   },
 );
 
@@ -75,7 +76,7 @@ export const putMembers = handler(
     ]);
 
     const view: TeamView = toTeamView(team, members, roles, today, todayAssignment);
-    return jsonOk(view);
+    return jsonOk(await withTimerSummary(view));
   },
 );
 

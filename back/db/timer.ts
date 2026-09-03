@@ -24,7 +24,7 @@ import {
   type TimerSession,
 } from '@/shared/timer';
 import type { DateStr } from '@/shared/date';
-import type { TimerStateView } from '@/shared/types';
+import type { TimerStateView, TimerSummary } from '@/shared/types';
 
 interface SessionRow {
   id: string;
@@ -271,4 +271,22 @@ export async function patchSession(
   if (error) throw error;
   // 그사이 다른 화면이 끝냈다면 지금 상태를 그대로 읽어 돌려준다
   return data ? toSession(data as SessionRow) : requireSession(sessionId, assignmentId);
+}
+
+/**
+ * 지금 타이머가 돌고 있는지만 가볍게 본다.
+ *
+ * 결과 화면이 "타이머 준비하기"와 "타이머 보기" 중 무엇을 보여줄지 정하는 데 쓴다.
+ * 남은 시간은 담지 않는다 — 결과 화면은 시계가 아니고, 시계로 만들면
+ * 매초 다시 그려야 한다.
+ */
+export async function loadTimerSummary(assignmentId: string): Promise<TimerSummary | null> {
+  const active = await loadActive(assignmentId);
+  if (!active) return null;
+
+  // 예정 시각이 지났거나 하루가 지난 세션은 돌고 있는 것이 아니다
+  const now = Date.now();
+  if (isOverdue(active, now) || isStale(active, now)) return null;
+
+  return { kind: active.kind, paused: active.pausedAt !== null };
 }

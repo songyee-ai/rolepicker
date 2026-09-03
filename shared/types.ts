@@ -52,6 +52,8 @@ export interface AssignmentView {
   /** 사람이 부족해 비운 역할 */
   unfilledRoles: RoleView[];
   updatedAt: string;
+  /** 지금 타이머가 돌고 있으면 그 단계. 아니면 null */
+  timer: TimerSummary | null;
 }
 
 export interface TeamView {
@@ -134,4 +136,13 @@ export interface StartSessionRequest {
 
 export interface PatchSessionRequest {
   action: 'pause' | 'resume' | 'end';
+}
+
+/**
+ * 지금 타이머가 돌고 있는지. 결과 화면이 이걸 보고 버튼을 바꾼다.
+ * 남은 시간까지 담지 않는다 — 결과 화면은 시계가 아니다.
+ */
+export interface TimerSummary {
+  kind: 'study' | 'break';
+  paused: boolean;
 }

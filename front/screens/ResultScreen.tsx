@@ -169,8 +169,20 @@ export default function ResultScreen({ team }: { team: TeamView & { today: Assig
       <Notice>{error}</Notice>
 
       <div className="mt-auto">
+        {/*
+          조원 한 명이 타이머를 켜면 다른 조원 화면의 버튼이 바뀐다.
+          화면을 멋대로 옮기지는 않는다 — 결과를 보고 있는 사람을 갑자기
+          어두운 시계 화면으로 끌고 가지 않는다. 대신 무슨 일이 벌어지고
+          있는지 알려주고, 갈지 말지는 누르는 사람이 정한다 (PRD §17).
+        */}
+        {assignment.timer ? (
+          <p className="mb-[6px] text-center text-[11px] font-light text-ink-60">
+            지금 {assignment.timer.kind === 'study' ? '학습' : '쉬는 시간'}이
+            {assignment.timer.paused ? ' 멈춰 있어요' : ' 흐르고 있어요'}
+          </p>
+        ) : null}
         <ButtonLink href={`/t/${team.slug}/timer`} tone="lime">
-          타이머 준비하기
+          {assignment.timer ? '타이머 보기' : '타이머 준비하기'}
         </ButtonLink>
         <div className="mt-[6px]">
           {settled ? (
