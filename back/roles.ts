@@ -47,10 +47,3 @@ export const DEFAULT_ROLES: RoleSeed[] = [
     isDefault: true, // 뽑지 않는다
   },
 ];
-
-/** 뽑기 대기 화면에 노출하는 그라운드 룰 (PRD §4) */
-export const GROUND_RULES = [
-  '카메라는 켜두기',
-  '조용한 그루에게 먼저 말 걸기',
-  '모르면 옆 그루에게 물어보기',
-] as const;
