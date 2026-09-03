@@ -100,6 +100,17 @@ export const api = {
     });
   },
 
+  /**
+   * 약속만 저장한다. 타이머가 돌아가는 중에 길이를 바꾸는 경우다.
+   * 지금 돌아가는 세션은 그대로 두고 다음 단계부터 적용된다.
+   */
+  saveTimerPlan(slug: string, plan: TimerPlan) {
+    return request<TimerStateView>(`/api/teams/${slug}/timer/sessions`, {
+      method: 'POST',
+      body: JSON.stringify({ plan }),
+    });
+  },
+
   patchTimerSession(slug: string, sessionId: string, action: 'pause' | 'resume' | 'end') {
     return request<TimerStateView>(`/api/teams/${slug}/timer/sessions/${sessionId}`, {
       method: 'PATCH',

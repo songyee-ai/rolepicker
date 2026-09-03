@@ -27,5 +27,11 @@ export default async function Page({
   // 그 링크에는 ?edit=1 이 붙어 있어 여기 머문다.
   if (page.state.current && edit !== '1') redirect('/t/' + slug + '/timer/run');
 
-  return <TimerSetupScreen team={page.team} plan={page.state.plan} />;
+  return (
+    <TimerSetupScreen
+      team={page.team}
+      plan={page.state.plan}
+      running={page.state.current !== null}
+    />
+  );
 }

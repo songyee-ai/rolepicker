@@ -55,7 +55,14 @@ export const postSession = handler(async (request: Request, context: SlugContext
   const assignmentId = await assignmentIdFor(slug);
 
   const body = await readJson(request);
-  const kind = oneOf(body, 'kind', KINDS);
+
+  /**
+   * kind 가 없으면 약속만 저장한다.
+   * 타이머가 돌아가는 중에 `시간 다시 정하기`로 와서 길이를 바꾸는 경우다.
+   * 지금 돌아가는 세션은 건드리지 않고 다음 단계부터 적용된다.
+   */
+  const wantsStart = (body as { kind?: unknown }).kind !== undefined;
+  const kind = wantsStart ? oneOf(body, 'kind', KINDS) : null;
 
   const rawPlan = (body as { plan?: { studySec?: unknown; breakSec?: unknown } }).plan;
   const studySec = optionalInt(rawPlan?.studySec, '학습 시간', STUDY_MIN * 60, STUDY_MAX * 60);
@@ -64,8 +71,29 @@ export const postSession = handler(async (request: Request, context: SlugContext
   if ((studySec === undefined) !== (breakSec === undefined)) {
     throw new ApiError('BAD_REQUEST', '학습 시간과 쉬는 시간을 함께 보내주세요.');
   }
+  if (!wantsStart && studySec === undefined) {
+    throw new ApiError('BAD_REQUEST', '무엇을 할지 알 수 없어요.');
+  }
+
+  const before = await loadTimerState(assignmentId);
+
   if (studySec !== undefined && breakSec !== undefined) {
-    await savePlan(assignmentId, studySec, breakSec);
+    /*
+      돌아가는 세션이 있는데 kind 까지 함께 온 요청은, 조원 두 명이 거의 같은
+      순간에 `시작`을 누른 경우다. 뒤에 누른 사람 화면의 다이얼 값으로 그날의
+      약속이 바뀌면, 지금 돌아가는 40분이 끝난 뒤 쉬는 시간이 엉뚱한 길이가 된다.
+      먼저 누른 사람의 약속을 지킨다.
+
+      약속만 보낸 요청(kind 없음)은 일부러 바꾸러 온 것이므로 그대로 저장한다.
+    */
+    const isRaceLoser = wantsStart && before.current !== null;
+    if (!isRaceLoser) {
+      await savePlan(assignmentId, studySec, breakSec);
+    }
+  }
+
+  if (kind === null) {
+    return jsonOk(await loadTimerState(assignmentId));
   }
 
   const state = await loadTimerState(assignmentId);

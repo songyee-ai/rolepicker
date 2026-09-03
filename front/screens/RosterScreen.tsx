@@ -36,6 +36,7 @@ import ConfirmButton from '@/front/ui/ConfirmButton';
 import LinkBanner from '@/front/ui/LinkBanner';
 import { api, messageOf } from '@/front/lib/api';
 import { rememberTeam } from '@/front/lib/recent-teams';
+import { useTimerWatch } from '@/front/lib/use-timer-watch';
 import { formatKstDateLabel, todayKst } from '@/shared/date';
 import type { TeamView } from '@/shared/types';
 
@@ -84,6 +85,13 @@ export default function RosterScreen({ team }: { team: TeamView }) {
    * 남의 결과를 덮어쓰지 않게 한다 (PRD §16).
    */
   const drawIsPrimary = drawn === null || !settled || touched;
+
+  // 다른 조원이 타이머를 켜면 이 화면도 함께 옮겨간다
+  useTimerWatch({
+    slug: team.slug,
+    runningAtLoad: drawn?.timer != null,
+    enabled: drawn !== null,
+  });
 
   function toggle(memberId: string) {
     setPresent((current) => {

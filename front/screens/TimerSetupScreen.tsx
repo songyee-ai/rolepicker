@@ -5,22 +5,19 @@
  *
  * 세션 합계 문장("40분씩 네 세션이면…")은 넣지 않는다. 세션 수를 사용자가
  * 정한 적이 없는데 임의로 가정한 문장이었다 (PRD §6 S6).
+ *
+ * 두 가지 상태가 있다.
+ *   (1) 아직 안 켰다 — `시작`을 누르면 약속을 저장하고 학습을 시작한다
+ *   (2) 돌아가는 중에 길이를 바꾸러 왔다 (?edit=1) — 지금 세션은 건드리지 않고
+ *       다음 단계부터 적용한다. 그래서 버튼 문구도 `시작`이 아니다
  */
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import {
-  BackLink,
-  Button,
-  FooterNote,
-  Lede,
-  Notice,
-  Screen,
-  Title,
-  TopBar,
-} from '@/front/ui/kit';
+import { BackLink, Button, FooterNote, Lede, Notice, Screen, Title, TopBar } from '@/front/ui/kit';
 import { api, messageOf } from '@/front/lib/api';
 import { requestNotifyPermission, unlockAudio } from '@/front/lib/alarm';
+import { useTimerWatch } from '@/front/lib/use-timer-watch';
 import {
   BREAK_DEFAULT,
   BREAK_MAX,
@@ -41,52 +38,68 @@ import type { TeamView, TimerPlan } from '@/shared/types';
 export default function TimerSetupScreen({
   team,
   plan,
+  running,
 }: {
   team: TeamView;
   /** 오늘 이미 정해둔 약속이 있으면 그 값에서 시작한다 */
   plan: TimerPlan | null;
+  /** 지금 타이머가 돌아가는 중인가 (길이만 바꾸러 온 경우) */
+  running: boolean;
 }) {
   const router = useRouter();
   const [study, setStudy] = useState(plan ? Math.round(plan.studySec / 60) : STUDY_DEFAULT);
   const [rest, setRest] = useState(plan ? Math.round(plan.breakSec / 60) : BREAK_DEFAULT);
   const [error, setError] = useState('');
-  const [starting, setStarting] = useState(false);
+  const [working, setWorking] = useState(false);
+
+  // 이 화면에서 기다리는 동안 다른 조원이 켜면 함께 옮겨간다
+  useTimerWatch({ slug: team.slug, runningAtLoad: running, enabled: Boolean(team.today) });
 
   const keeper =
     team.today?.assigned.find((entry) => entry.role.key === 'keeper')?.member.name ?? null;
 
-  async function start() {
+  async function submit() {
     setError('');
-    setStarting(true);
-
-    /*
-      알림 권한은 이 순간에 요청한다. 진입 즉시 요청하면 대부분 거부한다 (PRD §14).
-      소리도 지금 준비해둔다 — 사용자 제스처 없이는 재생이 막힌다.
-    */
-    await requestNotifyPermission();
-    unlockAudio();
+    setWorking(true);
 
     try {
-      await api.startTimerSession(team.slug, 'study', {
-        studySec: study * 60,
-        breakSec: rest * 60,
-      });
+      if (running) {
+        // 지금 세션은 그대로 두고 다음 단계부터 적용한다
+        await api.saveTimerPlan(team.slug, { studySec: study * 60, breakSec: rest * 60 });
+      } else {
+        /*
+          알림 권한은 이 순간에 요청한다. 진입 즉시 요청하면 대부분 거부한다 (PRD §14).
+          소리도 지금 준비해둔다 — 사용자 제스처 없이는 재생이 막힌다.
+        */
+        await requestNotifyPermission();
+        unlockAudio();
+        await api.startTimerSession(team.slug, 'study', {
+          studySec: study * 60,
+          breakSec: rest * 60,
+        });
+      }
       router.push(`/t/${team.slug}/timer/run`);
     } catch (caught) {
       setError(messageOf(caught));
-      setStarting(false);
+      setWorking(false);
     }
   }
 
   return (
     <Screen>
       <TopBar
-        left={<BackLink href={`/t/${team.slug}`}>오늘의 역할</BackLink>}
+        left={<BackLink href={running ? `/t/${team.slug}/timer/run` : `/t/${team.slug}`}>
+          {running ? '타이머로' : '오늘의 역할'}
+        </BackLink>}
         right={<span>{keeper ? `⏱️ 시간지키미 · ${keeper}` : '타이머 준비'}</span>}
       />
 
-      <Title>학습 시간 정하기</Title>
-      <Lede>조원과 이야기하고 정해주세요.</Lede>
+      <Title>{running ? '시간 다시 정하기' : '학습 시간 정하기'}</Title>
+      <Lede>
+        {running
+          ? '지금 돌아가는 시간은 그대로예요. 다음 단계부터 바뀝니다.'
+          : '조원과 이야기하고 정해주세요.'}
+      </Lede>
 
       <div className="mt-[13px]">
         <Dial
@@ -106,19 +119,19 @@ export default function TimerSetupScreen({
           presets={BREAK_PRESETS}
           kind="break"
         />
-      </div>
 
-      <Notice>{error}</Notice>
-
-      <div className="mt-auto pt-4">
         {/*
-          ± 버튼에 작은 글씨를 붙이지 않는다. 시작 버튼 바로 위 한 줄로 둔다 (PRD §6 S6).
-          학습 시간이 길면 그 자리에 다른 안내를 넣는다. 막지는 않는다.
+          다이얼 쓰는 방법을 설명하는 줄이므로 다이얼 바로 밑에 둔다.
+          PRD §6 S6이 정한 것은 "± 버튼에 작은 글씨를 붙이지 않는다"이고,
+          박스 아래 한 줄은 그 조건을 지킨다.
+          학습 시간이 길면 이 자리가 안내로 바뀐다. 막지는 않는다.
         */}
         {study > LONG_STUDY_MINUTES ? (
-          <FooterNote>집중이 잘 되는 구간은 30~40분입니다.</FooterNote>
+          <p className="mt-[6px] px-[2px] text-[11.5px] font-light leading-[1.6] text-warn">
+            집중이 잘 되는 구간은 30~40분입니다.
+          </p>
         ) : (
-          <p className="mb-[11px] flex items-start gap-[7px] text-[11.5px] font-light leading-[1.6] text-ink-60">
+          <p className="mt-[6px] flex items-start gap-[7px] px-[2px] text-[11.5px] font-light leading-[1.6] text-ink-60">
             <em className="mt-px flex-none rounded-[5px] bg-rule-soft px-[5px] font-mono text-[11px] font-semibold not-italic text-ink">
               − +
             </em>
@@ -128,9 +141,32 @@ export default function TimerSetupScreen({
             </span>
           </p>
         )}
+      </div>
 
-        <Button onClick={start} disabled={starting}>
-          {starting ? '시작하고 있어요…' : '시작'}
+      <Notice>{error}</Notice>
+
+      <div className="mt-auto pt-4">
+        {/*
+          버튼 바로 위는 누르기 직전 마지막으로 읽는 자리다. 누가 눌러야 하는지를 적는다.
+          이름을 넣는다 — "시간지키미가 누르세요"는 규칙이고 "김민지 그루가
+          누르세요"는 지시다. 화상 통화 중이면 후자가 바로 움직이게 만든다.
+        */}
+        {!running ? (
+          <FooterNote>
+            {keeper
+              ? `오늘 시간지키미는 ${keeper} 그루예요. 시간을 정하고 눌러주세요.`
+              : '시간을 정하고 눌러주세요.'}
+          </FooterNote>
+        ) : null}
+
+        <Button onClick={submit} disabled={working}>
+          {working
+            ? running
+              ? '바꾸는 중이에요…'
+              : '시작하고 있어요…'
+            : running
+              ? '다음 단계부터 적용'
+              : '시작'}
         </Button>
       </div>
     </Screen>

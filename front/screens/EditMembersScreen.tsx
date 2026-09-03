@@ -28,6 +28,7 @@ import {
 } from '@/front/ui/kit';
 import LinkBanner from '@/front/ui/LinkBanner';
 import { api, messageOf } from '@/front/lib/api';
+import { useTimerWatch } from '@/front/lib/use-timer-watch';
 import {
   cleanName,
   findDuplicateNames,
@@ -57,6 +58,18 @@ export default function EditMembersScreen({ team }: { team: TeamView }) {
   const [removed, setRemoved] = useState<{ row: Row; at: number } | null>(null);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [timerStarted, setTimerStarted] = useState(false);
+
+  /*
+    이 화면만 예외로 자동 이동하지 않는다. 이름을 타이핑하던 중에 화면이
+    바뀌면 저장하지 않은 입력이 그대로 사라진다. 대신 한 줄로 알린다.
+  */
+  useTimerWatch({
+    slug: team.slug,
+    runningAtLoad: team.today?.timer != null,
+    enabled: Boolean(team.today),
+    onStart: () => setTimerStarted(true),
+  });
 
   const pendingFocus = useRef<number | null>(null);
   const inputs = useRef(new Map<number, HTMLInputElement>());
@@ -145,6 +158,18 @@ export default function EditMembersScreen({ team }: { team: TeamView }) {
         left={<BackLink href={`/t/${team.slug}`}>저장 안 하고 나가기</BackLink>}
         right={<span>명단 고치기</span>}
       />
+
+      {timerStarted ? (
+        <div className="mb-3 flex items-center justify-between gap-2 rounded-[12px] border-[1.5px] border-lime bg-[#FBFFEF] px-[11px] py-[9px]">
+          <p className="text-[11px] font-medium text-lime-deep">타이머가 시작됐어요</p>
+          <Link
+            href={`/t/${team.slug}/timer/run`}
+            className="flex-none rounded-[7px] bg-lime px-[9px] py-[5px] text-[11px] font-semibold text-lime-deep"
+          >
+            보러 가기
+          </Link>
+        </div>
+      ) : null}
 
       <Title>명단 고치기</Title>
       <Lede>

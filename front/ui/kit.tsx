@@ -112,7 +112,7 @@ export function StickyFooter({ children }: { children: ReactNode }) {
 
 // ─── 버튼 ────────────────────────────────────────────────────────
 
-type ButtonTone = 'ink' | 'lime' | 'quiet' | 'quiet-dark';
+type ButtonTone = 'ink' | 'lime' | 'quiet' | 'quiet-dark' | 'ghost-dark';
 
 const TONE: Record<ButtonTone, string> = {
   ink: 'bg-ink text-paper font-semibold',
@@ -120,6 +120,8 @@ const TONE: Record<ButtonTone, string> = {
   quiet: 'border border-rule bg-transparent text-ink-60 font-medium',
   // 타이머 실행 화면은 어둡다. 같은 연한 톤을 그 배경에 맞춘 것 (목업 .dark .go.quiet)
   'quiet-dark': 'border border-[#2E3846] bg-transparent text-[#93A0B0] font-medium',
+  // 가끔 쓰는 출구. 테두리를 없애 세 번째 무게를 만든다
+  'ghost-dark': 'bg-transparent text-[#6B7889] font-medium',
 };
 
 const BUTTON_BASE =

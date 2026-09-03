@@ -14,7 +14,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { BackLink, Button, ButtonLink, Notice, Screen, TopBar } from '@/front/ui/kit';
+import { Button, ButtonLink, Notice, Screen, TopBar } from '@/front/ui/kit';
 import { api, messageOf } from '@/front/lib/api';
 import { keepScreenAwake, notifyPermission, ring, unlockAudio } from '@/front/lib/alarm';
 import {
@@ -32,6 +32,9 @@ import type { AssignmentView, TeamView, TimerStateView } from '@/shared/types';
 
 /** 화면을 다시 그리는 간격. 서버 기준으로 매번 계산하므로 정확도와 무관하다 */
 const TICK_MS = 250;
+
+/** 조원끼리 상태를 맞추는 간격 (일시정지·단계 전환) */
+const SYNC_INTERVAL_MS = 3000;
 
 /**
  * 알림 권한은 구독할 대상이 아니다. 화면을 그릴 때마다 지금 값을 읽기만 한다.
@@ -113,13 +116,21 @@ export default function TimerRunScreen({
     }
   }, [apply, team.slug]);
 
+  /*
+    조 전체가 하나의 타이머를 함께 본다. 한 명이 일시정지하면 모두 멈춰야 한다.
+    그래서 화면이 보이는 동안 3초마다 서버와 맞춘다.
+    안 맞추면 A는 멈춰 있다고 생각하는데 B 화면은 계속 흘러간다 (PRD §10).
+    탭이 보이지 않으면 묻지 않고, 다시 보이는 순간 한 번 묻는다.
+  */
   useEffect(() => {
     const onVisible = () => {
       if (document.visibilityState === 'visible') void refresh();
     };
+    const id = window.setInterval(onVisible, SYNC_INTERVAL_MS);
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('focus', onVisible);
     return () => {
+      window.clearInterval(id);
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('focus', onVisible);
     };
@@ -208,19 +219,22 @@ export default function TimerRunScreen({
     }
   }
 
+  const keeperName =
+    team.today.assigned.find((entry) => entry.role.key === 'keeper')?.member.name ?? null;
   const studySeconds = totalStudySec(state.sessions, now);
   const lastKind = state.sessions.at(-1)?.kind ?? null;
   const waitingKind = nextKind(lastKind);
 
   return (
     <Screen dark>
+      {/* 나가는 길은 하단 버튼 줄로 옮겼다. 어두운 화면에서 좌상단 연한 글씨는 잘 안 보인다 */}
       <TopBar
-        left={<BackLink href={`/t/${team.slug}`}>오늘의 역할</BackLink>}
-        right={
+        left={
           <span className="text-[#5E6B7C]">
             {state.studyCount > 0 ? `${state.studyCount}번째 학습` : '타이머'}
           </span>
         }
+        right={<span className="text-[#5E6B7C]">{formatKstTime(now)}</span>}
       />
 
       <div className="flex flex-1 flex-col items-center justify-center">
@@ -305,7 +319,20 @@ export default function TimerRunScreen({
           ))}
         </div>
 
-        <p className="mt-[14px] text-[11px] font-light text-[#93A0B0]">
+        {/*
+          오늘의 역할을 한 줄로. 아바타는 색으로만 구분하니 이름이 안 보인다.
+          이 줄이 있으면 "오늘 이끄미가 누구였지"를 확인하러 결과 화면까지
+          갈 이유가 줄어든다.
+        */}
+        {team.today.assigned.length > 0 ? (
+          <p className="mt-[10px] text-[11.5px] font-light text-[#93A0B0]">
+            {team.today.assigned
+              .map((entry) => `${entry.role.emoji} ${entry.member.name}`)
+              .join(' · ')}
+          </p>
+        ) : null}
+
+        <p className="mt-[10px] text-[11px] font-light text-[#93A0B0]">
           오늘 누적 학습 {formatDuration(studySeconds)}
         </p>
       </div>
@@ -318,26 +345,46 @@ export default function TimerRunScreen({
 
       <Notice>{error}</Notice>
 
-      <div className="mt-auto flex flex-col gap-[6px] pt-4">
-        {current ? (
-          <>
-            <Button tone="lime" onClick={skip} disabled={busy}>
-              {nextKind(current.kind) === 'break' ? '쉬는시간으로 넘기기' : '학습으로 넘기기'}
-            </Button>
-            <Button tone="quiet-dark" onClick={togglePause} disabled={busy}>
-              {paused ? '이어서 하기' : '일시정지'}
-            </Button>
-          </>
-        ) : (
-          <>
-            <Button tone="lime" onClick={() => void startNext(waitingKind)} disabled={busy}>
-              {waitingKind === 'break' ? '쉬는시간 시작' : '학습 시작'}
-            </Button>
-            <ButtonLink href={`/t/${team.slug}/timer?edit=1`} tone="quiet-dark">
-              시간 다시 정하기
-            </ButtonLink>
-          </>
-        )}
+      <div className="mt-auto pt-4">
+        {/*
+          단계를 넘기는 것은 시간지키미의 일이다 (PRD §4). 하지만 이 서비스는
+          "이 브라우저가 누구인지" 모른다 — 로그인이 없기 때문이다 (PRD §3-1).
+          그래서 버튼을 감추는 대신 이름을 적어 지목한다. 권한이 아니라 신호다.
+          누가 눌러도 조 전체가 함께 넘어가고, 그건 의도된 동작이다.
+        */}
+        {keeperName ? (
+          <p className="mb-2 text-center text-[10.5px] font-light leading-[1.5] text-[#6B7889]">
+            ⏱️ 시간지키미 <b className="font-semibold text-[#93A0B0]">{keeperName}</b> 그루가
+            넘겨주세요
+          </p>
+        ) : null}
+
+        <div className="flex flex-col gap-[6px]">
+          {current ? (
+            <>
+              <Button tone="lime" onClick={skip} disabled={busy}>
+                {nextKind(current.kind) === 'break' ? '쉬는시간으로 넘기기' : '학습으로 넘기기'}
+              </Button>
+              <Button tone="quiet-dark" onClick={togglePause} disabled={busy}>
+                {paused ? '이어서 하기' : '일시정지'}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button tone="lime" onClick={() => void startNext(waitingKind)} disabled={busy}>
+                {waitingKind === 'break' ? '쉬는시간 시작' : '학습 시작'}
+              </Button>
+              <ButtonLink href={`/t/${team.slug}/timer?edit=1`} tone="quiet-dark">
+                시간 다시 정하기
+              </ButtonLink>
+            </>
+          )}
+
+          {/* 가끔 쓰는 출구. 세 번째 무게로 둔다 */}
+          <ButtonLink href={`/t/${team.slug}`} tone="ghost-dark">
+            오늘의 역할 확인하기
+          </ButtonLink>
+        </div>
       </div>
     </Screen>
   );

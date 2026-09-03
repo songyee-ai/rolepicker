@@ -25,6 +25,7 @@ import {
 import ConfirmButton from '@/front/ui/ConfirmButton';
 import { api, messageOf } from '@/front/lib/api';
 import { rememberTeam } from '@/front/lib/recent-teams';
+import { useTimerWatch } from '@/front/lib/use-timer-watch';
 import { formatKstDateLabel, todayKst } from '@/shared/date';
 import type { AssignmentView, MemberRef, TeamView } from '@/shared/types';
 
@@ -35,6 +36,13 @@ export default function ResultScreen({ team }: { team: TeamView & { today: Assig
   const [assignment, setAssignment] = useState<AssignmentView>(team.today);
   const [error, setError] = useState('');
   const [rerolling, setRerolling] = useState(false);
+
+  /*
+    조원 한 명이 타이머를 켜면 이 화면도 함께 타이머로 옮겨간다.
+    화면을 열었을 때 이미 돌고 있었다면 옮기지 않는다 — 타이머에서
+    일부러 나온 사람이 곧바로 다시 끌려가지 않게 하려는 것이다.
+  */
+  useTimerWatch({ slug: team.slug, runningAtLoad: team.today.timer !== null });
 
   const presentIds = [
     ...assignment.assigned.map((entry) => entry.member.id),
@@ -170,10 +178,9 @@ export default function ResultScreen({ team }: { team: TeamView & { today: Assig
 
       <div className="mt-auto">
         {/*
-          조원 한 명이 타이머를 켜면 다른 조원 화면의 버튼이 바뀐다.
-          화면을 멋대로 옮기지는 않는다 — 결과를 보고 있는 사람을 갑자기
-          어두운 시계 화면으로 끌고 가지 않는다. 대신 무슨 일이 벌어지고
-          있는지 알려주고, 갈지 말지는 누르는 사람이 정한다 (PRD §17).
+          타이머가 돌고 있으면 버튼 문구가 바뀐다. 이 화면을 일부러 열어둔
+          사람(타이머에서 나온 사람)은 자동으로 끌려가지 않으므로, 돌아갈
+          길이 눈에 보여야 한다.
         */}
         {assignment.timer ? (
           <p className="mb-[6px] text-center text-[11px] font-light text-ink-60">
