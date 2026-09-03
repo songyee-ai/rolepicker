@@ -306,14 +306,18 @@ export async function rerollAssignment(
 
   await writeContents(existing.id, result, context, true);
 
-  const { error: touchError } = await client
+  // 갱신한 줄을 그대로 돌려받는다. 갱신 전 객체를 재사용하면 응답의 updatedAt이
+  // 옛 값이 되고, 그러면 다른 사람 화면이 "새 결과가 나왔다"를 알아채지 못한다 (PRD §14)
+  const { data: touched, error: touchError } = await client
     .from('assignments')
     .update({ updated_at: new Date().toISOString() })
-    .eq('id', existing.id);
+    .eq('id', existing.id)
+    .select('id, team_id, date, created_at, updated_at')
+    .single();
   if (touchError) throw touchError;
 
   const detail = await loadDetail(existing.id);
-  return buildView({ ...existing }, detail, context.members, context.roleRows);
+  return buildView(touched as AssignmentRow, detail, context.members, context.roleRows);
 }
 
 /** 오늘 배정을 읽는다. 없으면 null */

@@ -5,10 +5,13 @@ import './globals.css';
 // 서체는 PRD §13 그대로. 본문은 Sans KR, 시각·타이머 숫자는 Mono
 const plexKr = IBM_Plex_Sans_KR({
   variable: '--font-plex-kr',
-  // 한글 글리프를 받아오려면 korean subset이 필요하다. 빼면 대체 서체로 나온다
-  subsets: ['latin', 'korean'],
   weight: ['300', '400', '500', '600', '700'],
   display: 'swap',
+  // subsets 를 지정하면 그 글자 묶음만 받아온다. ['latin'] 만 쓰면 한글이
+  // 대체 서체로 나오고, 'korean' 은 Next의 타입 목록에 아직 없다.
+  // 문서가 안내하는 방법대로 subsets 를 비우고 preload 를 끄면
+  // 모든 글자 묶음을 받아오되 미리 불러오기만 생략한다.
+  preload: false,
 });
 
 const plexMono = IBM_Plex_Mono({
