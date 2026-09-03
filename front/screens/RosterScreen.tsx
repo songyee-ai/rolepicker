@@ -70,6 +70,20 @@ export default function RosterScreen({ team }: { team: TeamView }) {
   /** 이미 뽑은 날에 빈자리를 건드렸는가 */
   const touched = drawn !== null && keyOf(present) !== keyOf(baseline);
 
+  /** 사람이 부족했거나 명단이 바뀌어서 비어 있는 역할 */
+  const unfilled = drawn?.unfilledRoles ?? [];
+
+  /** 오늘 배정이 있고, 모든 역할이 채워져 있는가 */
+  const settled = drawn !== null && unfilled.length === 0;
+
+  /**
+   * 뽑는 버튼이 주 버튼이 되는 경우.
+   * 아직 안 뽑았거나, 비어 있는 역할이 있거나, 참여를 고쳤을 때다.
+   * 그 외에는 결과 보기가 주 버튼이다 — 보러 온 사람이 무심코 눌러
+   * 남의 결과를 덮어쓰지 않게 한다 (PRD §16).
+   */
+  const drawIsPrimary = drawn === null || !settled || touched;
+
   function toggle(memberId: string) {
     setPresent((current) => {
       const next = new Set(current);
@@ -132,8 +146,12 @@ export default function RosterScreen({ team }: { team: TeamView }) {
 
       <Title>오늘 함께할 그루</Title>
 
-      {/* 이미 뽑은 날이라는 것을 먼저 알린다 */}
-      {drawn ? (
+      {/*
+        오늘 상태를 먼저 알린다. 배정 줄이 있다고 다 뽑힌 것은 아니다.
+        뽑은 뒤에 그 역할을 맡은 그루를 명단에서 내리면 역할이 빈 채로 남는다.
+        그 상태에서 "이미 뽑았어요"라고 하면 거짓말이 된다.
+      */}
+      {drawn && settled ? (
         <div className="mt-[10px] rounded-[12px] border border-rule bg-white px-[11px] py-[9px]">
           <p className="text-[11px] font-medium text-ink-60">오늘은 이미 뽑았어요</p>
           {leadName ? (
@@ -144,6 +162,24 @@ export default function RosterScreen({ team }: { team: TeamView }) {
           ) : null}
           <p className="mt-[6px] text-[10.5px] font-light leading-[1.5] text-ink-60">
             빈자리가 달라졌으면 아래에서 고치고 다시 뽑을 수 있어요.
+          </p>
+        </div>
+      ) : null}
+
+      {drawn && !settled ? (
+        <div className="mt-[10px] rounded-[12px] border-[1.5px] border-lime bg-[#FBFFEF] px-[11px] py-[9px]">
+          <p className="text-[11px] font-medium text-lime-deep">
+            아직 정해지지 않은 역할이 있어요
+          </p>
+          <p className="mt-[5px] flex flex-wrap items-center gap-[6px]">
+            {unfilled.map((role) => (
+              <RoleLabel key={role.id} tone="rule">
+                {role.emoji} {role.name}
+              </RoleLabel>
+            ))}
+          </p>
+          <p className="mt-[6px] text-[10.5px] font-light leading-[1.5] text-ink-60">
+            그 역할을 맡은 그루가 명단에서 빠지면 자리가 비어요. 아래에서 다시 뽑으면 채워져요.
           </p>
         </div>
       ) : null}
@@ -217,44 +253,38 @@ export default function RosterScreen({ team }: { team: TeamView }) {
           </FooterNote>
         ) : null}
 
+        {/*
+          버튼 문구는 상태에 따라 바꾸지 않는다. 무엇이 달라졌는지는 이 한 줄이
+          알리고, 버튼은 무슨 일이 일어나는지만 그대로 적는다 (PRD §17).
+          '빈자리 반영'처럼 쓰면 전원 참여로 고친 경우에 말이 안 맞는다.
+        */}
+        {touched ? <FooterNote>참여를 고쳤어요. 다시 뽑으면 반영돼요.</FooterNote> : null}
+
         {drawn === null ? (
+          /* 아직 안 뽑은 날에는 볼 결과가 없으니 버튼도 하나뿐이다 */
           <Button onClick={draw} disabled={!canDraw || working}>
             {working ? '뽑고 있어요…' : '역할 뽑기'}
           </Button>
+        ) : drawIsPrimary ? (
+          <>
+            <Button onClick={draw} disabled={!canDraw || working}>
+              {working ? '다시 뽑고 있어요…' : '다시 뽑기'}
+            </Button>
+            <ButtonLink href={`/t/${team.slug}`} tone="quiet" className="mt-[6px]">
+              오늘 결과 보기
+            </ButtonLink>
+          </>
         ) : (
           <>
-            {/*
-              버튼 문구는 상태에 따라 바꾸지 않는다. 무엇이 달라졌는지는 이 한 줄이
-              알리고, 버튼은 무슨 일이 일어나는지만 그대로 적는다 (PRD §17).
-              '빈자리 반영'처럼 쓰면 전원 참여로 고친 경우에 말이 안 맞는다.
-            */}
-            {touched ? (
-              <FooterNote>참여를 고쳤어요. 다시 뽑으면 반영돼요.</FooterNote>
-            ) : null}
-
-            {/* 고친 사람에게는 다시 뽑기가, 보러 온 사람에게는 결과 보기가 주 버튼이 된다 */}
-            {touched ? (
-              <>
-                <Button onClick={draw} disabled={!canDraw || working}>
-                  {working ? '다시 뽑고 있어요…' : '다시 뽑기'}
-                </Button>
-                <ButtonLink href={`/t/${team.slug}`} tone="quiet" className="mt-[6px]">
-                  오늘 결과 보기
-                </ButtonLink>
-              </>
-            ) : (
-              <>
-                <ButtonLink href={`/t/${team.slug}`}>오늘 결과 보기</ButtonLink>
-                <Button
-                  tone="quiet"
-                  className="mt-[6px]"
-                  onClick={draw}
-                  disabled={!canDraw || working}
-                >
-                  {working ? '다시 뽑고 있어요…' : '다시 뽑기'}
-                </Button>
-              </>
-            )}
+            <ButtonLink href={`/t/${team.slug}`}>오늘 결과 보기</ButtonLink>
+            <Button
+              tone="quiet"
+              className="mt-[6px]"
+              onClick={draw}
+              disabled={!canDraw || working}
+            >
+              {working ? '다시 뽑고 있어요…' : '다시 뽑기'}
+            </Button>
           </>
         )}
       </StickyFooter>
