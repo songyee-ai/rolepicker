@@ -29,14 +29,39 @@ Supabase는 아직 붙이지 않았다. `npm test`는 DB 없이 돌아간다.
 
 ### M1 진행 상황
 
-- [x] `lib/date.ts` — KST 날짜 유틸 (테스트 12개)
-- [x] `lib/rng.ts` — 시드 고정 난수 (테스트용)
-- [x] `lib/assign.ts` — 배정 알고리즘 (테스트 42개)
-- [ ] `lib/names.ts` — 이니셜 추출, 붙여넣기 파싱, 동명이인 검출
-- [ ] `lib/slug.ts` — 링크 주소 발급
-- [ ] Supabase 스키마 + 서버 클라이언트
-- [ ] API 라우트 6개
+- [x] `shared/date.ts` — KST 날짜 유틸
+- [x] `back/rng.ts` — 시드 고정 난수 (테스트용)
+- [x] `back/assign.ts` — 배정 알고리즘
+- [x] `shared/names.ts` — 이니셜 추출, 붙여넣기 파싱, 동명이인 검출
+- [x] `back/slug.ts` — 링크 주소 발급
+- [x] `supabase/migrations/0001_init.sql` — 스키마 + RLS
+- [x] API 6개 (`docs/API.md`)
+- [ ] **Supabase 프로젝트 연결** ← `supabase/README.md` 참고
 - [ ] 화면 (S2 새 조 만들기 → S3 조원 확인 → S4 뽑는 순간 → S5 결과 → 명단 고치기)
+
+검사 116개.
+
+## 폴더 구조
+
+```
+app/       주소록. Next.js는 폴더 이름이 곧 웹 주소가 되므로 위치를 옮길 수 없다.
+           대신 로직을 한 줄도 두지 않고 "이 주소는 저 함수"만 가리킨다
+front/     화면
+back/      서버 — DB 접근, 배정, API 구현. 비밀값은 이 폴더 밖으로 나가지 않는다
+shared/    양쪽이 같이 쓰는 것 — 날짜, 이름 규칙, 주고받는 값의 모양
+supabase/  DB 설계와 연결 방법
+docs/      API 구성과 보안 정리
+```
+
+경계는 문서가 아니라 검사가 지킨다 (`back/boundaries.test.ts`). `front`가 `back`을 불러오거나 서버 키가 `back` 밖에 나타나면 `npm test`가 실패한다.
+
+## 문서
+
+| 파일 | 내용 |
+|---|---|
+| `docs/API.md` | 주소 6개의 요청·응답·오류, 멱등성 구현 |
+| `docs/SECURITY.md` | 비밀값을 어디 두는지, 세 겹의 차단 |
+| `supabase/README.md` | Supabase 연결 순서 (복사·붙여넣기만) |
 
 ## 배정 알고리즘
 

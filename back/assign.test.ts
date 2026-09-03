@@ -8,7 +8,7 @@ import {
   type HistoryEntry,
   type Role,
 } from './assign';
-import { addDays } from './date';
+import { addDays } from '@/shared/date';
 import { seededRng, type Rng } from './rng';
 
 // ─────────────────────────────────────────────────────────────

@@ -14,7 +14,7 @@
  *   6. 남은 사람은 모두 그루
  */
 
-import { daysBetween, type DateStr } from './date';
+import { daysBetween, type DateStr } from '@/shared/date';
 import { systemRng, type Rng } from './rng';
 
 /** 최근 며칠 안에 같은 역할을 맡았으면 후보에서 빼는가 (PRD §7) */

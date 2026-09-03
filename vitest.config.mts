@@ -9,6 +9,6 @@ export default defineConfig({
     environment: 'node',
     // 공정성 시뮬레이션은 시드 200개를 돌리므로 기본 5초로는 부족하다
     testTimeout: 30_000,
-    include: ['lib/**/*.test.ts', 'app/**/*.test.ts'],
+    include: ['{back,front,shared}/**/*.test.ts'],
   },
 });
