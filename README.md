@@ -16,14 +16,15 @@ npm test           # 단위 테스트
 npm run typecheck  # 타입 검사
 ```
 
-Supabase는 아직 붙이지 않았다. `npm test`는 DB 없이 돌아간다.
+Supabase 값이 `.env.local`에 있어야 조를 만들 수 있다 (`supabase/README.md`). 값이 없으면 화면이 죽지 않고 설정 안내를 보여준다.
+`npm test`는 DB 없이 돌아간다.
 
 ## 마일스톤 진행 (PRD §15)
 
 | | 내용 | 상태 |
 |---|---|---|
 | M1 | 조 생성 → 명단 → 참여/빈자리 → 서버 배정 → 결과 | 완료 |
-| M2 | 타이머 | 진행 중 |
+| M2 | 타이머 | 완료 |
 | M3 | 지난 기록 | |
 | M4 | 다듬기 (첫 화면 두 상태, 사용법, 연출, PWA) | |
 
@@ -46,8 +47,8 @@ Supabase는 아직 붙이지 않았다. `npm test`는 DB 없이 돌아간다.
 - [x] `supabase/migrations/0002_timer.sql` — 진행 중 세션 하나 보장 + 그날의 약속
 - [x] 타이머 API 3개 (`docs/API.md`)
 - [x] S6 타이머 준비 · S7 타이머 실행
-- [ ] **`0002_timer.sql` 실행** ← `supabase/README.md` 2-6
-- [ ] 실제 DB로 흐름 확인
+- [x] `0002_timer.sql` 실행
+- [x] 실제 DB로 흐름 확인 (멱등 · 일시정지 · 자동 순환 · 탭 닫았다 열기 · 방치 보정)
 
 검사 149개.
 
@@ -69,9 +70,9 @@ docs/      API 구성과 보안 정리
 
 | 파일 | 내용 |
 |---|---|
-| `docs/API.md` | 주소 6개의 요청·응답·오류, 멱등성 구현 |
+| `docs/API.md` | 주소 9개의 요청·응답·오류, 멱등성 구현, 타이머 |
 | `docs/SECURITY.md` | 비밀값을 어디 두는지, 세 겹의 차단 |
-| `supabase/README.md` | Supabase 연결 순서 (복사·붙여넣기만) |
+| `supabase/README.md` | Supabase 연결 순서 (복사·붙여넣기만). SQL 두 개를 돌린다 |
 
 ## 배정 알고리즘
 
