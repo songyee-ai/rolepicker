@@ -32,6 +32,7 @@ import {
   Title,
   TopBar,
 } from '@/front/ui/kit';
+import ConfirmButton from '@/front/ui/ConfirmButton';
 import LinkBanner from '@/front/ui/LinkBanner';
 import { api, messageOf } from '@/front/lib/api';
 import { rememberTeam } from '@/front/lib/recent-teams';
@@ -133,6 +134,42 @@ export default function RosterScreen({ team }: { team: TeamView }) {
       memberNames: team.members.map((member) => member.name),
     });
   }, [team.slug, team.members, leadName]);
+
+  const drawLabel = drawn === null ? '역할 뽑기' : '다시 뽑기';
+  const busyLabel = drawn === null ? '뽑고 있어요…' : '다시 뽑고 있어요…';
+  const drawTone = drawIsPrimary ? 'ink' : 'quiet';
+
+  /**
+   * 완성된 오늘 결과를 덮어쓸 때만 한 번 묻는다 (PRD §3-7).
+   * 첫 뽑기는 매일 하는 일이라 묻지 않고, 비어 있는 역할을 채우는 것도
+   * 지울 결과가 없으니 묻지 않는다.
+   */
+  const drawButton = settled ? (
+    <ConfirmButton
+      tone={drawTone}
+      label={drawLabel}
+      question={
+        leadName
+          ? `지금 결과를 지우고 새로 뽑아요. 🎯 이끄미 ${leadName}도 바뀔 수 있어요.`
+          : '지금 결과를 지우고 새로 뽑아요.'
+      }
+      confirmLabel="네, 다시 뽑기"
+      busy={working}
+      busyLabel={busyLabel}
+      disabled={!canDraw}
+      onConfirm={draw}
+    />
+  ) : (
+    <Button tone={drawTone} onClick={draw} disabled={!canDraw || working}>
+      {working ? busyLabel : drawLabel}
+    </Button>
+  );
+
+  const resultButton = (
+    <ButtonLink href={`/t/${team.slug}`} tone={drawIsPrimary ? 'quiet' : 'ink'}>
+      오늘 결과 보기
+    </ButtonLink>
+  );
 
   return (
     <Screen>
@@ -260,33 +297,11 @@ export default function RosterScreen({ team }: { team: TeamView }) {
         */}
         {touched ? <FooterNote>참여를 고쳤어요. 다시 뽑으면 반영돼요.</FooterNote> : null}
 
-        {drawn === null ? (
-          /* 아직 안 뽑은 날에는 볼 결과가 없으니 버튼도 하나뿐이다 */
-          <Button onClick={draw} disabled={!canDraw || working}>
-            {working ? '뽑고 있어요…' : '역할 뽑기'}
-          </Button>
-        ) : drawIsPrimary ? (
-          <>
-            <Button onClick={draw} disabled={!canDraw || working}>
-              {working ? '다시 뽑고 있어요…' : '다시 뽑기'}
-            </Button>
-            <ButtonLink href={`/t/${team.slug}`} tone="quiet" className="mt-[6px]">
-              오늘 결과 보기
-            </ButtonLink>
-          </>
-        ) : (
-          <>
-            <ButtonLink href={`/t/${team.slug}`}>오늘 결과 보기</ButtonLink>
-            <Button
-              tone="quiet"
-              className="mt-[6px]"
-              onClick={draw}
-              disabled={!canDraw || working}
-            >
-              {working ? '다시 뽑고 있어요…' : '다시 뽑기'}
-            </Button>
-          </>
-        )}
+        <div className="flex flex-col gap-[6px]">
+          {/* 주 버튼을 먼저 그린다. 아직 안 뽑은 날에는 볼 결과가 없으니 하나뿐이다 */}
+          {drawIsPrimary ? drawButton : resultButton}
+          {drawn === null ? null : drawIsPrimary ? resultButton : drawButton}
+        </div>
       </StickyFooter>
     </Screen>
   );

@@ -22,6 +22,7 @@ import {
   Title,
   TopBar,
 } from '@/front/ui/kit';
+import ConfirmButton from '@/front/ui/ConfirmButton';
 import { api, messageOf } from '@/front/lib/api';
 import { rememberTeam } from '@/front/lib/recent-teams';
 import { formatKstDateLabel, todayKst } from '@/shared/date';
@@ -77,6 +78,10 @@ export default function ResultScreen({ team }: { team: TeamView & { today: Assig
       memberNames: team.members.map((member) => member.name),
     });
   }, [team.slug, team.members, assignment]);
+
+  const leadName = assignment.assigned.find((entry) => entry.role.key === 'lead')?.member.name ?? null;
+  /** 아직 정해지지 않은 역할이 있으면 지울 결과가 없다. 그때는 묻지 않는다 */
+  const settled = assignment.unfilledRoles.length === 0;
 
   async function reroll() {
     setError('');
@@ -167,9 +172,26 @@ export default function ResultScreen({ team }: { team: TeamView & { today: Assig
         <ButtonLink href={`/t/${team.slug}/timer`} tone="lime">
           타이머 준비하기
         </ButtonLink>
-        <Button tone="quiet" className="mt-[6px]" onClick={reroll} disabled={rerolling}>
-          {rerolling ? '다시 뽑고 있어요…' : '다시 뽑기'}
-        </Button>
+        <div className="mt-[6px]">
+          {settled ? (
+            <ConfirmButton
+              label="다시 뽑기"
+              question={
+                leadName
+                  ? `지금 결과를 지우고 새로 뽑아요. 🎯 이끄미 ${leadName}도 바뀔 수 있어요.`
+                  : '지금 결과를 지우고 새로 뽑아요.'
+              }
+              confirmLabel="네, 다시 뽑기"
+              busy={rerolling}
+              busyLabel="다시 뽑고 있어요…"
+              onConfirm={reroll}
+            />
+          ) : (
+            <Button tone="quiet" onClick={reroll} disabled={rerolling}>
+              {rerolling ? '다시 뽑고 있어요…' : '다시 뽑기'}
+            </Button>
+          )}
+        </div>
       </div>
     </Screen>
   );
