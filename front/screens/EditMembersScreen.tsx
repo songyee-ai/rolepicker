@@ -14,7 +14,8 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-  BlockedHint,
+  BackLink,
+  FooterNote,
   Button,
   CountRow,
   Lede,
@@ -141,12 +142,8 @@ export default function EditMembersScreen({ team }: { team: TeamView }) {
   return (
     <Screen>
       <TopBar
-        left="명단 고치기"
-        right={
-          <Link href={`/t/${team.slug}`} className="text-[10px] text-ink-60">
-            저장 안 하고 나가기
-          </Link>
-        }
+        left={<BackLink href={`/t/${team.slug}`}>저장 안 하고 나가기</BackLink>}
+        right={<span>명단 고치기</span>}
       />
 
       <Title>명단 고치기</Title>
@@ -259,11 +256,11 @@ export default function EditMembersScreen({ team }: { team: TeamView }) {
       </div>
 
       <StickyFooter>
-        {empty ? <BlockedHint>이름이 하나도 없으면 저장할 수 없어요.</BlockedHint> : null}
+        {empty ? <FooterNote>이름이 하나도 없으면 저장할 수 없어요.</FooterNote> : null}
         {tooMany ? (
-          <BlockedHint>
+          <FooterNote>
             한 조는 {MAX_MEMBERS}명까지예요. {names.length}명이면 조를 나누는 게 좋아요.
-          </BlockedHint>
+          </FooterNote>
         ) : null}
         <Button onClick={save} disabled={saving || empty || tooMany}>
           {saving ? '저장하고 있어요…' : '저장하기'}

@@ -232,8 +232,12 @@ export function Notice({ children, tone = 'warn' }: { children: ReactNode; tone?
   );
 }
 
-/** 왜 버튼을 못 누르는지 짧게 알린다 (PRD §14 — 회색으로만 만들지 않는다) */
-export function BlockedHint({ children }: { children: ReactNode }) {
+/**
+ * 하단 버튼 위의 한 줄 안내.
+ * 왜 버튼을 못 누르는지, 또는 무엇이 달라졌는지를 짧게 적는다.
+ * 버튼을 회색으로만 만들고 이유를 안 알려주면 안 된다 (PRD §14).
+ */
+export function FooterNote({ children }: { children: ReactNode }) {
   return (
     <p className="pb-2 text-center text-[10.5px] font-light leading-[1.5] text-ink-60">
       {children}

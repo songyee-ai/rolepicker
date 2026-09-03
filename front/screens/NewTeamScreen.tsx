@@ -9,7 +9,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  BlockedHint,
+  BackLink,
+  FooterNote,
   Button,
   CountRow,
   Lede,
@@ -136,7 +137,11 @@ export default function NewTeamScreen() {
 
   return (
     <Screen>
-      <TopBar left="새 조 만들기" />
+      {/* 조가 이미 있는데 실수로 들어온 사람이 돌아갈 길이 있어야 한다 */}
+      <TopBar
+        left={<BackLink href="/">처음으로</BackLink>}
+        right={<span>새 조 만들기</span>}
+      />
       <Title>누가 함께하나요</Title>
       <Lede>
         조 이름은 안 물어봐요.
@@ -218,11 +223,11 @@ export default function NewTeamScreen() {
 
       <StickyFooter>
         {tooMany ? (
-          <BlockedHint>
+          <FooterNote>
             한 조는 {MAX_MEMBERS}명까지예요. {names.length}명이면 조를 나누는 게 좋아요.
-          </BlockedHint>
+          </FooterNote>
         ) : names.length === 0 ? (
-          <BlockedHint>이름을 한 명 이상 넣으면 링크를 만들 수 있어요.</BlockedHint>
+          <FooterNote>이름을 한 명 이상 넣으면 링크를 만들 수 있어요.</FooterNote>
         ) : null}
         <Button onClick={submit} disabled={saving || tooMany || names.length === 0}>
           {saving ? '만들고 있어요…' : '만들기'}

@@ -4,16 +4,18 @@
  * S0. 첫 화면 — / (PRD §6 S0)
  *
  * 같은 라우트에서 브라우저에 저장된 최근 목록 유무로 두 상태가 갈린다.
- * 최근 목록은 브라우저에만 있고 서버에 없으므로, 서버에서 미리 그릴 수 없다.
- * 그래서 목록을 읽기 전에는 '처음 온 사람' 화면을 보여주고, 읽은 뒤에
- * 목록이 있으면 그것을 위에 얹는다.
+ * 최근 목록은 브라우저에만 있고 서버에 없으므로 서버에서 미리 그릴 수 없다.
+ * useSyncExternalStore 로 읽어서, 화면을 이어받은 뒤에 목록이 나타난다.
+ *
+ * 목록은 눌러도 바로 이동하지 않는다. 고른 다음 하단 버튼으로 연다.
+ * 그래야 굵은 테두리와 원형 색이 "지금 고른 조"라는 뜻을 갖고,
+ * 잘못 눌러서 남의 조로 들어가는 일도 없다.
  *
  * 코드 입력칸은 항상 보인다. 시크릿 모드나 기기 변경이면 목록이 비어 있고,
  * 그때 남는 유일한 통로다 (PRD §14).
  */
 
 import { useState, useSyncExternalStore } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Avatar, ButtonLink, Divider, Notice, Screen } from '@/front/ui/kit';
 import { api, messageOf } from '@/front/lib/api';
@@ -37,9 +39,16 @@ export default function LandingScreen() {
     recentTeamsSnapshot,
     recentTeamsServerSnapshot,
   );
+
+  // 아무것도 안 골랐으면 가장 최근에 쓴 조가 골라져 있다
+  const [picked, setPicked] = useState<string | null>(null);
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [entering, setEntering] = useState(false);
+
+  const hasRecent = recent.length > 0;
+  const selectedSlug = picked ?? recent[0]?.slug ?? null;
+  const selected = recent.find((team) => team.slug === selectedSlug) ?? null;
 
   async function enter() {
     setError('');
@@ -57,12 +66,10 @@ export default function LandingScreen() {
     }
   }
 
-  const hasRecent = recent.length > 0;
-
   return (
     <Screen>
-      <div className="mb-3 flex items-center justify-between font-mono text-[10px] text-ink-35">
-        <span className="rounded-[5px] bg-lime px-[7px] py-[2px] font-sans text-[11px] font-semibold text-lime-deep">
+      <div className="mb-3 flex items-center justify-between">
+        <span className="rounded-[5px] bg-lime px-[7px] py-[2px] text-[11px] font-semibold text-lime-deep">
           그루뽑기
         </span>
       </div>
@@ -73,22 +80,28 @@ export default function LandingScreen() {
             다시 오셨네요
           </h1>
 
-          <p className="mb-[6px] mt-[14px] text-[11.5px] font-medium text-ink-60">최근 사용한 조</p>
+          <p className="mb-[6px] mt-[14px] text-[11.5px] font-medium text-ink-60">어느 조인가요</p>
 
-          <ul>
-            {recent.map((team, index) => (
-              <li key={team.slug}>
-                <Link
-                  href={`/t/${team.slug}/check`}
+          <div role="radiogroup" aria-label="최근 사용한 조">
+            {recent.map((team) => {
+              const isSelected = team.slug === selectedSlug;
+              return (
+                <button
+                  key={team.slug}
+                  type="button"
+                  role="radio"
+                  aria-checked={isSelected}
+                  onClick={() => setPicked(team.slug)}
                   className={[
-                    'mb-[6px] flex items-center gap-[9px] rounded-[11px] bg-white px-[10px] py-[9px]',
-                    index === 0 ? 'border-[1.5px] border-ink' : 'border border-rule',
+                    'mb-[6px] flex w-full items-center gap-[9px] rounded-[11px] bg-white px-[10px] py-[9px] text-left',
+                    isSelected ? 'border-[1.5px] border-ink' : 'border border-rule',
                   ].join(' ')}
                 >
+                  {/* 원형 색은 '지금 고른 조'를 뜻한다. 목록 순서와는 상관이 없다 */}
                   <Avatar
                     initial={team.lastLeadName ? initialOf(team.lastLeadName) : '·'}
                     name={team.lastLeadName ?? undefined}
-                    tone={index === 0 ? 'lead' : 'add'}
+                    tone={isSelected ? 'lead' : 'add'}
                   />
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-[5px] text-[13px] font-semibold">
@@ -104,10 +117,10 @@ export default function LandingScreen() {
                   <span className="flex-none font-mono text-[10px] text-ink-35">
                     {team.lastUsedAt.slice(5).replace('-', '월 ')}일
                   </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
+                </button>
+              );
+            })}
+          </div>
 
           {/* 굵은 이름이 무엇인지 알려준다 (PRD §6 S0) */}
           <p className="pt-[7px] text-[10.5px] font-light leading-[1.55] text-ink-60">
@@ -181,10 +194,10 @@ export default function LandingScreen() {
       <Notice>{error}</Notice>
 
       <div className="mt-auto pt-4">
-        {hasRecent ? (
+        {selected ? (
           <>
-            <ButtonLink href={`/t/${recent[0].slug}/check`}>
-              {recent[0].lastLeadName ? `${recent[0].lastLeadName} 그루의 조 열기` : '최근 조 열기'}
+            <ButtonLink href={`/t/${selected.slug}/check`}>
+              {selected.lastLeadName ? `${selected.lastLeadName} 그루의 조 열기` : '이 조 열기'}
             </ButtonLink>
             <ButtonLink href="/new" tone="quiet" className="mt-[6px]">
               새 조 만들기

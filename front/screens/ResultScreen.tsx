@@ -93,7 +93,7 @@ export default function ResultScreen({ team }: { team: TeamView & { today: Assig
   return (
     <Screen>
       <TopBar
-        left={<BackLink href="/">조 다시 선택</BackLink>}
+        left={<BackLink href="/">처음으로</BackLink>}
         right={<span>{formatKstDateLabel(assignment.date)}</span>}
       />
       <Title>오늘의 역할</Title>

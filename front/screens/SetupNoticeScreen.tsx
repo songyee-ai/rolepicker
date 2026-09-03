@@ -44,7 +44,7 @@ export default function SetupNoticeScreen() {
 
       <div className="mt-auto pt-4">
         <ButtonLink href="/" tone="quiet">
-          첫 화면으로
+          처음으로
         </ButtonLink>
       </div>
     </Screen>

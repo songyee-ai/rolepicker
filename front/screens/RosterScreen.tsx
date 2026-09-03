@@ -14,13 +14,13 @@
  *     (PRD §16 — 조원 전원이 같은 결과를 본다).
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Avatar,
   BackLink,
-  BlockedHint,
+  FooterNote,
   Button,
   ButtonLink,
   CountRow,
@@ -107,10 +107,23 @@ export default function RosterScreen({ team }: { team: TeamView }) {
 
   const leadName = drawn?.assigned.find((entry) => entry.role.key === 'lead')?.member.name ?? null;
 
+  /**
+   * 첫 화면의 최근 목록은 브라우저에만 있어서, 다른 사람이 다시 뽑으면
+   * 내 목록의 이끄미 이름이 옛 값으로 남는다. 이 화면을 열 때 맞춰준다.
+   */
+  useEffect(() => {
+    rememberTeam({
+      slug: team.slug,
+      lastUsedAt: todayKst(),
+      lastLeadName: leadName,
+      memberNames: team.members.map((member) => member.name),
+    });
+  }, [team.slug, team.members, leadName]);
+
   return (
     <Screen>
       <TopBar
-        left={<BackLink href="/">조 다시 선택</BackLink>}
+        left={<BackLink href="/">처음으로</BackLink>}
         right={<span>{formatKstDateLabel(todayKst())}</span>}
       />
 
@@ -199,36 +212,49 @@ export default function RosterScreen({ team }: { team: TeamView }) {
       <StickyFooter>
         {!canDraw ? (
           /* 회색으로만 만들지 말고 왜 못 누르는지 알린다 (PRD §14) */
-          <BlockedHint>
+          <FooterNote>
             참여가 {MIN_PRESENT}명부터 뽑을 수 있어요. 지금은 {presentCount}명이에요.
-          </BlockedHint>
+          </FooterNote>
         ) : null}
 
         {drawn === null ? (
           <Button onClick={draw} disabled={!canDraw || working}>
             {working ? '뽑고 있어요…' : '역할 뽑기'}
           </Button>
-        ) : touched ? (
-          <>
-            {/* 빈자리를 고쳤으면 그걸 반영하는 버튼이 주 버튼이 된다 */}
-            <Button onClick={draw} disabled={!canDraw || working}>
-              {working ? '다시 뽑고 있어요…' : '빈자리 반영해서 다시 뽑기'}
-            </Button>
-            <ButtonLink href={`/t/${team.slug}`} tone="quiet" className="mt-[6px]">
-              고친 것 버리고 오늘 결과 보기
-            </ButtonLink>
-          </>
         ) : (
           <>
-            <ButtonLink href={`/t/${team.slug}`}>오늘 결과 보기</ButtonLink>
-            <Button
-              tone="quiet"
-              className="mt-[6px]"
-              onClick={draw}
-              disabled={!canDraw || working}
-            >
-              {working ? '다시 뽑고 있어요…' : '이대로 다시 뽑기'}
-            </Button>
+            {/*
+              버튼 문구는 상태에 따라 바꾸지 않는다. 무엇이 달라졌는지는 이 한 줄이
+              알리고, 버튼은 무슨 일이 일어나는지만 그대로 적는다 (PRD §17).
+              '빈자리 반영'처럼 쓰면 전원 참여로 고친 경우에 말이 안 맞는다.
+            */}
+            {touched ? (
+              <FooterNote>참여를 고쳤어요. 다시 뽑으면 반영돼요.</FooterNote>
+            ) : null}
+
+            {/* 고친 사람에게는 다시 뽑기가, 보러 온 사람에게는 결과 보기가 주 버튼이 된다 */}
+            {touched ? (
+              <>
+                <Button onClick={draw} disabled={!canDraw || working}>
+                  {working ? '다시 뽑고 있어요…' : '다시 뽑기'}
+                </Button>
+                <ButtonLink href={`/t/${team.slug}`} tone="quiet" className="mt-[6px]">
+                  오늘 결과 보기
+                </ButtonLink>
+              </>
+            ) : (
+              <>
+                <ButtonLink href={`/t/${team.slug}`}>오늘 결과 보기</ButtonLink>
+                <Button
+                  tone="quiet"
+                  className="mt-[6px]"
+                  onClick={draw}
+                  disabled={!canDraw || working}
+                >
+                  {working ? '다시 뽑고 있어요…' : '다시 뽑기'}
+                </Button>
+              </>
+            )}
           </>
         )}
       </StickyFooter>
