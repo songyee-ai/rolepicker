@@ -10,7 +10,10 @@ import type {
   CreateTeamResponse,
   ResolveResponse,
   TeamView,
+  TimerPlan,
+  TimerStateView,
 } from '@/shared/types';
+import type { SessionKind } from '@/shared/timer';
 
 export class ApiClientError extends Error {
   constructor(
@@ -82,6 +85,25 @@ export const api = {
     return request<AssignmentView>(`/api/teams/${slug}/reroll`, {
       method: 'POST',
       body: JSON.stringify({ presentMemberIds }),
+    });
+  },
+
+  getTimer(slug: string) {
+    return request<TimerStateView>(`/api/teams/${slug}/timer/sessions`);
+  },
+
+  /** 세션 시작. 처음 시작할 때만 plan 을 함께 보내 그날의 약속을 저장한다 */
+  startTimerSession(slug: string, kind: SessionKind, plan?: TimerPlan) {
+    return request<TimerStateView>(`/api/teams/${slug}/timer/sessions`, {
+      method: 'POST',
+      body: JSON.stringify(plan ? { kind, plan } : { kind }),
+    });
+  },
+
+  patchTimerSession(slug: string, sessionId: string, action: 'pause' | 'resume' | 'end') {
+    return request<TimerStateView>(`/api/teams/${slug}/timer/sessions/${sessionId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ action }),
     });
   },
 

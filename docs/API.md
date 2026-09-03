@@ -37,8 +37,9 @@
 | POST | `/api/teams/[slug]/assign` | 역할 뽑기 (멱등) | M1 ✅ |
 | POST | `/api/teams/[slug]/reroll` | 다시 뽑기 (덮어쓰기) | M1 ✅ |
 | GET | `/api/resolve?code=` | 코드 → 링크 주소 | M1 ✅ |
-| POST | `/api/teams/[slug]/timer/sessions` | 타이머 세션 시작 | M2 |
-| PATCH | `/api/teams/[slug]/timer/sessions/[id]` | 일시정지 · 재개 · 종료 | M2 |
+| GET | `/api/teams/[slug]/timer/sessions` | 타이머 상태 조회 | M2 ✅ |
+| POST | `/api/teams/[slug]/timer/sessions` | 세션 시작 | M2 ✅ |
+| PATCH | `/api/teams/[slug]/timer/sessions/[id]` | 일시정지 · 재개 · 종료 | M2 ✅ |
 | GET | `/api/teams/[slug]/history?days=14` | 역할별 횟수 + 학습 통계 | M3 |
 
 ---
@@ -281,8 +282,87 @@ MANGO 7B2C9F    MANGO--7B2C-9F    (앞뒤 공백 포함)
 
 모든 `date`는 **한국 시간(KST) 기준 `YYYY-MM-DD`**다. 서버는 UTC로 돌기 때문에 `shared/date.ts`의 함수만 써서 계산한다. 그러지 않으면 오전 9시 이전에 하루가 어긋난다 (PRD §14).
 
+## 타이머 (M2)
+
+세 주소 모두 **같은 모양**을 돌려준다. 화면은 응답을 그대로 상태로 삼으면 되고, 무엇이 바뀌었는지 따로 계산하지 않는다.
+
+```json
+{
+  "plan": { "studySec": 2400, "breakSec": 600 },
+  "current": {
+    "id": "…", "kind": "study", "plannedSec": 2400,
+    "startedAt": "2026-09-04T01:00:00.000Z",
+    "pausedAt": null, "pausedTotalSec": 0, "endedAt": null
+  },
+  "sessions": [ "…" ],
+  "totalStudySec": 3780,
+  "studyCount": 2,
+  "serverNow": "2026-09-04T01:16:46.000Z"
+}
+```
+
+### 남은 시간을 서버가 세지 않는다
+
+서버는 `startedAt`(서버 시각)과 `plannedSec`만 확정한다. 남은 시간은 화면이 그 값으로 계산한다 (PRD §10). 그래서
+
+- 탭을 닫았다 열어도 이어진다 — 계산에 쓰는 것이 시작 시각뿐이다
+- 백그라운드 탭에서 `setInterval`이 느려져도 어긋나지 않는다 (PRD §14)
+- 여러 명이 봐도 같은 숫자가 보인다
+
+`serverNow`는 **시계 오차 보정용**이다. 화면은 (서버 시각 − 내 시각)만큼 밀어서 쓴다. 사용자 컴퓨터 시계가 3분 틀어져 있어도 남은 시간이 맞다.
+
+### GET `/api/teams/[slug]/timer/sessions`
+
+PRD §9 목록에는 없지만 필요하다. 탭을 닫았다 열면 현재 세션을 다시 받아야 한다.
+
+**읽으면서 뒤처진 세션을 정리한다.**
+
+- 예정 시각이 지났는데 아무도 안 넘긴 세션 → 예정 시각에 끝난 것으로 처리
+- 시작한 지 24시간이 지난 세션 → 끝난 것으로 처리 (일시정지한 채로 하루를 넘긴 경우, PRD §14)
+
+**다음 단계를 자동으로 시작하지는 않는다.** 몇 시간 방치했는데 그 사이 세션이 여러 번 돌아간 것처럼 꾸미면 기록이 거짓이 된다. 화면을 보고 있던 클라이언트가 자동으로 넘기고, 아무도 없었으면 다음에 연 사람이 시작한다.
+
+### POST `/api/teams/[slug]/timer/sessions`
+
+```json
+{ "kind": "study", "plan": { "studySec": 2400, "breakSec": 600 } }
+```
+
+`plan`은 **처음 시작할 때만** 보낸다. 그 값이 그날의 약속으로 배정에 저장되고, 다른 조원 화면도 같은 길이로 돌아간다. 이후 단계 전환에서는 `kind`만 보낸다.
+
+**이미 진행 중인 세션이 있으면 새로 만들지 않고 그것을 돌려준다.** 시간이 다 되는 순간 여러 화면이 동시에 다음 단계를 알리기 때문이다. DB에 "끝나지 않은 세션은 한 배정에 하나"를 보장하는 부분 unique 인덱스를 둬서 경쟁을 DB가 정리한다.
+
+| 코드 | 상태 | 언제 |
+|---|---|---|
+| `NO_ASSIGNMENT` | 404 | 오늘 역할을 아직 안 뽑았다 |
+| `BAD_REQUEST` | 400 | 약속이 없거나, 쉬는 시간이 0분인데 쉬려고 한다 |
+
+### PATCH `/api/teams/[slug]/timer/sessions/[id]`
+
+```json
+{ "action": "pause" }
+```
+
+`action`은 `pause` · `resume` · `end` 중 하나다.
+
+**같은 동작을 두 번 보내도 결과가 같다.** 조원 둘이 동시에 일시정지를 눌러도 멈춘 시간이 두 배로 쌓이지 않는다. 이미 끝난 세션에 보내면 아무것도 하지 않고 지금 상태를 돌려준다.
+
+일시정지는 `paused_at` + `paused_total_sec`으로 정확히 계산한다. 멈춘 만큼 종료 예정 시각이 뒤로 밀린다 (PRD §10).
+
+### 누적 학습시간
+
+**세션이 속한 배정 기준으로 센다. 날짜를 보지 않는다** (PRD §14). 23:50에 뽑고 00:10에 타이머를 켜면 날짜가 바뀌는데, "오늘"로 집계하면 끊긴다.
+
+한 세션이 채운 시간은 **계획한 길이를 넘지 않는다.** 아무도 안 보는 사이 두 시간이 지났어도 40분 세션은 40분만 채운 것이다. 그러지 않으면 누적이 부풀려진다.
+
+### DB 추가 (`0002_timer.sql`)
+
+PRD §8 스키마에 없던 것 두 개를 넣었다.
+
+1. `timer_sessions`에 부분 unique 인덱스 — 진행 중인 세션은 한 배정에 하나
+2. `assignments.study_sec`, `assignments.break_sec` — 그날의 약속. 세션 기록만 보고 유추하면 쉬는 시간을 0분으로 정한 조를 구분할 수 없다 (쉬는 세션이 아예 안 만들어지므로)
+
 ## 아직 안 만든 것
 
-- **타이머** (M2) — `timer_sessions` 테이블은 이미 만들어져 있다. 남은 시간은 서버가 확정한 `started_at`으로 계산하고, 로컬 카운트다운을 진실로 삼지 않는다 (PRD §10)
 - **지난 기록** (M3) — 역할별 횟수와 학습 통계
 - **명단 되돌리기 주소** — `back/db/members.ts`에 함수(`restoreMember`)는 있지만 주소는 아직 없다. 화면을 만들 때 붙인다

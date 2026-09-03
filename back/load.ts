@@ -10,8 +10,9 @@ import 'server-only';
 import { isSupabaseConfigured } from './env';
 import { readAssignmentView } from './db/assignments';
 import { findTeamBySlug, loadMembers, loadRoles, toTeamView } from './db/teams';
+import { loadTimerState } from './db/timer';
 import { todayKst } from '@/shared/date';
-import type { TeamView } from '@/shared/types';
+import type { TeamView, TimerStateView } from '@/shared/types';
 
 export { isSupabaseConfigured };
 
@@ -28,4 +29,17 @@ export async function loadTeamView(slug: string): Promise<TeamView | null> {
   ]);
 
   return toTeamView(team, members, roles, today, todayAssignment);
+}
+
+/**
+ * 타이머 화면에 필요한 것. (M2)
+ * 오늘 배정이 없으면 타이머를 켤 수 없으므로 state 는 null 이다.
+ */
+export async function loadTimerPage(
+  slug: string,
+): Promise<{ team: TeamView; state: TimerStateView | null } | null> {
+  const team = await loadTeamView(slug);
+  if (!team) return null;
+  if (!team.today) return { team, state: null };
+  return { team, state: await loadTimerState(team.today.id) };
 }

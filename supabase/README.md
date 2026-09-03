@@ -75,6 +75,26 @@ teams  members  roles  assignments  assignment_items  attendances  timer_session
 
 ---
 
+## 2-6. 타이머용 SQL 한 번 더 (M2)
+
+타이머를 쓰려면 표에 두 가지를 더 넣어야 한다. 2-1~2-4와 똑같은 방법이다.
+
+1. 클립보드에 담는다
+
+```bash
+cat /c/airrel_work/rolepicker/supabase/migrations/0002_timer.sql | clip
+```
+
+2. **SQL Editor** 에서 빈 칸을 클릭하고 `Ctrl + V`
+3. 오른쪽 아래 `Run`
+4. `Success. No rows returned` 가 나오면 끝
+
+무엇이 들어가는지는 `migrations/0002_timer.sql` 주석과 `docs/API.md` 의 타이머 항목에 적어뒀다.
+
+> 여러 번 돌려도 안전하다. `if not exists` 로 되어 있어서 이미 있으면 아무것도 하지 않는다.
+
+---
+
 ## 3. 값 두 개 복사하기
 
 1. 왼쪽 아이콘 줄 **맨 아래 톱니바퀴**(**Project Settings**)를 클릭

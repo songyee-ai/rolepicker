@@ -6,6 +6,7 @@
  */
 
 import type { DateStr } from './date';
+import type { TimerSession } from './timer';
 
 /** 조원이 명단에서 지워진 뒤에도 지난 기록에 남아 있는 경우 (PRD §14) */
 export const DELETED_MEMBER_NAME = '(삭제된 그루)';
@@ -39,6 +40,8 @@ export interface AssignedRole {
 }
 
 export interface AssignmentView {
+  /** 타이머 세션이 이 배정에 붙는다 (PRD §8) */
+  id: string;
   date: DateStr;
   /** priority 순. 이끄미 -> 시간지키미 */
   assigned: AssignedRole[];
@@ -97,4 +100,38 @@ export interface ApiErrorBody {
     message: string;
     [key: string]: unknown;
   };
+}
+
+// ─── 타이머 (M2) ──────────────────────────────────────────────────
+
+/** 그날의 학습·쉬는 시간 약속. 조 전체가 같은 값을 본다 */
+export interface TimerPlan {
+  studySec: number;
+  breakSec: number;
+}
+
+export interface TimerStateView {
+  /** 아직 타이머를 준비하지 않은 날이면 null */
+  plan: TimerPlan | null;
+  /** 이 배정의 모든 세션. 누적 계산에 쓴다 */
+  sessions: TimerSession[];
+  /** 진행 중인 세션. 없으면 다음 단계를 기다리는 상태 */
+  current: TimerSession | null;
+  totalStudySec: number;
+  studyCount: number;
+  /**
+   * 서버 시각. 클라이언트 시계가 틀어져 있어도 남은 시간이 맞도록,
+   * 화면은 (서버 시각 − 내 시각)만큼 보정해서 쓴다 (PRD §10).
+   */
+  serverNow: string;
+}
+
+export interface StartSessionRequest {
+  kind: 'study' | 'break';
+  /** 처음 시작할 때만 보낸다. 그날의 약속을 저장한다 */
+  plan?: TimerPlan;
+}
+
+export interface PatchSessionRequest {
+  action: 'pause' | 'resume' | 'end';
 }

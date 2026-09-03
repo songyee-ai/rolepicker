@@ -1,8 +1,8 @@
-// S6. 타이머 준비 — 오늘 역할을 안 뽑았으면 켤 수 없다
+// S7. 타이머 실행 — 시간을 정하지 않았으면 준비 화면으로 보낸다
 import { notFound, redirect } from 'next/navigation';
 import { isSupabaseConfigured, loadTimerPage } from '@/back/load';
 import SetupNoticeScreen from '@/front/screens/SetupNoticeScreen';
-import TimerSetupScreen from '@/front/screens/TimerSetupScreen';
+import TimerRunScreen from '@/front/screens/TimerRunScreen';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +13,13 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
   const page = await loadTimerPage(slug);
   if (!page) notFound();
   if (!page.state) redirect('/t/' + slug);
+  if (!page.state.plan) redirect('/t/' + slug + '/timer');
+  if (!page.team.today) redirect('/t/' + slug);
 
-  return <TimerSetupScreen team={page.team} plan={page.state.plan} />;
+  return (
+    <TimerRunScreen
+      team={{ ...page.team, today: page.team.today }}
+      initial={page.state}
+    />
+  );
 }

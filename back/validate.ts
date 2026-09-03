@@ -61,3 +61,30 @@ export function memberArray(body: unknown, max: number): MemberInput[] {
     return id === undefined ? { name } : { id, name };
   });
 }
+
+/** 정해진 값 중 하나여야 하는 문자열 */
+export function oneOf<T extends string>(body: unknown, field: string, allowed: readonly T[]): T {
+  const value = (body as Record<string, unknown> | null)?.[field];
+  if (typeof value !== 'string' || !allowed.includes(value as T)) {
+    throw new ApiError('BAD_REQUEST', `${field} 값이 올바르지 않아요.`);
+  }
+  return value as T;
+}
+
+/** 범위 안의 정수. 없으면 undefined */
+export function optionalInt(
+  value: unknown,
+  label: string,
+  min: number,
+  max: number,
+): number | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new ApiError('BAD_REQUEST', `${label}이 숫자가 아니에요.`);
+  }
+  const rounded = Math.round(value);
+  if (rounded < min || rounded > max) {
+    throw new ApiError('BAD_REQUEST', `${label}이 범위를 벗어났어요.`);
+  }
+  return rounded;
+}

@@ -446,6 +446,7 @@ function buildView(
   absent.sort((a, b) => orderOf(a) - orderOf(b));
 
   return {
+    id: row.id,
     date: row.date,
     assigned,
     groos,
