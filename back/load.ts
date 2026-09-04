@@ -10,9 +10,10 @@ import 'server-only';
 import { isSupabaseConfigured } from './env';
 import { readAssignmentView } from './db/assignments';
 import { findTeamBySlug, loadMembers, loadRoles, toTeamView } from './db/teams';
+import { loadHistoryView } from './db/history';
 import { loadTimerState, loadTimerSummary } from './db/timer';
 import { todayKst } from '@/shared/date';
-import type { TeamView, TimerStateView } from '@/shared/types';
+import type { HistoryView, TeamView, TimerStateView } from '@/shared/types';
 
 export { isSupabaseConfigured };
 
@@ -53,4 +54,18 @@ export async function loadTimerPage(
   if (!team) return null;
   if (!team.today) return { team, state: null };
   return { team, state: await loadTimerState(team.today.id) };
+}
+
+/** 지난 기록 화면에 필요한 것. (M3) */
+export async function loadHistoryPage(
+  slug: string,
+  days?: number,
+): Promise<{ team: TeamView; history: HistoryView } | null> {
+  const team = await findTeamBySlug(slug);
+  if (!team) return null;
+
+  const view = await loadTeamView(slug);
+  if (!view) return null;
+
+  return { team: view, history: await loadHistoryView(team, todayKst(), days) };
 }

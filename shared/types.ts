@@ -146,3 +146,45 @@ export interface TimerSummary {
   kind: 'study' | 'break';
   paused: boolean;
 }
+
+// ─── 지난 기록 (M3) ───────────────────────────────────────────────
+
+export interface HistoryRow {
+  member: MemberRef;
+  /** roleId -> 이 기간에 맡은 횟수 */
+  counts: Record<string, number>;
+}
+
+/** 한 번도 그 역할을 맡지 않은 그루들 */
+export interface NeverHeldRole {
+  role: RoleView;
+  members: MemberRef[];
+}
+
+export interface StudyStats {
+  totalSec: number;
+  /** 타이머를 켠 날 수 */
+  studiedDays: number;
+  /** 켠 날로만 나눈 하루 평균 */
+  averageSec: number;
+  best: { date: DateStr; sessions: number; sec: number } | null;
+}
+
+export interface HistoryView {
+  days: number;
+  from: DateStr;
+  to: DateStr;
+  /** 이 기간에 뽑기 기록이 있는 날 수 */
+  recordedDays: number;
+  /** 이 조가 만들어진 뒤 지난 날 수 */
+  teamAgeDays: number;
+  roles: RoleView[];
+  rows: HistoryRow[];
+  /**
+   * 표는 지난 14일을 보여주지만 이 목록은 **전체 기간** 기준이다.
+   * 14일 안에만 0이고 그 전에 맡았다면 다음 뽑기에서 먼저 후보가 되지 않는다.
+   * 화면의 안내 문장이 거짓이 되지 않게 하려는 구분이다.
+   */
+  neverHeld: NeverHeldRole[];
+  study: StudyStats;
+}
