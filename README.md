@@ -87,6 +87,7 @@ docs/      API 구성과 보안 정리
 | `docs/API.md` | 주소 10개의 요청·응답·오류, 멱등성 구현, 타이머, 지난 기록 |
 | `docs/SECURITY.md` | 비밀값을 어디 두는지, 세 겹의 차단 |
 | `supabase/README.md` | Supabase 연결 순서 (복사·붙여넣기만). SQL 두 개를 돌린다 |
+| `docs/DEPLOY.md` | Vercel 배포 순서, 누가 쓸 수 있고 무엇이 막혀 있는지 |
 
 ## 배정 알고리즘
 
