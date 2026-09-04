@@ -6,7 +6,8 @@
  */
 
 import 'server-only';
-import { handler, jsonOk, readJson } from '../errors';
+import { ApiError, handler, jsonOk, readJson } from '../errors';
+ import { clientKey, rateLimit } from '../rate-limit';
 import { siteOrigin } from '../env';
 import { teamUrl } from '../slug';
 import { memberArray, stringArray } from '../validate';
@@ -21,8 +22,32 @@ import type { CreateTeamResponse, TeamView } from '@/shared/types';
 /** 이름을 몇 개까지 받아줄지. 상한(12명)보다 넉넉히 받고 안내로 막는다 */
 const MAX_NAME_INPUTS = 60;
 
+/**
+ * 한 곳에서 한 시간에 만들 수 있는 조 수.
+ *
+ * 이 서비스는 로그인이 없어서 누구나 조를 만들 수 있다. 그대로 두면
+ * 스크립트로 조를 계속 만들어 DB를 채울 수 있다. 사람이 손으로 만드는
+ * 속도로는 절대 걸리지 않는 선으로 잡는다 — 같은 교실에서 여러 조가
+ * 같은 인터넷 회선으로 한꺼번에 만들어도 넉넉하다.
+ */
+const CREATE_LIMIT = 20;
+const CREATE_WINDOW_SEC = 3600;
+
 /** POST /api/teams — 조 생성 후 slug와 code를 돌려준다 */
 export const postTeams = handler(async (request: Request) => {
+  const { allowed, retryAfterSec } = rateLimit(
+    `create:${clientKey(request)}`,
+    CREATE_LIMIT,
+    CREATE_WINDOW_SEC,
+  );
+  if (!allowed) {
+    throw new ApiError(
+      'RATE_LIMITED',
+      `조를 너무 많이 만들었어요. ${Math.ceil(retryAfterSec / 60)}분 뒤에 다시 시도해 주세요.`,
+      { retryAfterSec },
+    );
+  }
+
   const body = await readJson(request);
   const names = stringArray(body, 'names', MAX_NAME_INPUTS);
 
