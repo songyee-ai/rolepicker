@@ -153,6 +153,76 @@ describe('비밀값 취급 (PRD §12)', () => {
   });
 });
 
+describe('화면 규칙 (PRD §11, §17)', () => {
+  const screens = [...collectFiles('front'), ...collectFiles('app')].filter(
+    (file) => !file.endsWith('.test.ts'),
+  );
+
+  it('★ 에러 문구는 사과하지 않는다 — 무엇이 잘못됐고 어떻게 하면 되는지 적는다', () => {
+    // PRD §17. 사용자가 잘못한 게 아닌데 서비스가 사과하면 원인이 흐려진다
+    const sources = [...screens, ...collectFiles('back'), ...collectFiles('shared')].filter(
+      (file) => !file.endsWith('.test.ts'),
+    );
+    for (const file of sources) {
+      const code = codeOnly(read(file));
+      for (const word of ['죄송', '미안', '실패했습니다', '오류가 발생']) {
+        expect(code, toPosix(file) + ' 에 "' + word + '" 이 있다').not.toContain(word);
+      }
+    }
+  });
+
+  it('★ 명단 화면에 별도 스크롤을 만들지 않는다 (PRD §11)', () => {
+    // 스크롤 영역이 두 개면 모바일에서 손가락이 어디를 잡았는지에 따라
+    // 엉뚱하게 움직이고, 명단 일부가 화면 밖에 숨어 참여 상태 확인이 어려워진다
+    for (const file of screens) {
+      const code = codeOnly(read(file));
+      for (const cls of ['overflow-auto', 'overflow-y-auto', 'overflow-scroll', 'overflow-y-scroll']) {
+        expect(code, toPosix(file) + ' 에 ' + cls + ' 이 있다').not.toContain(cls);
+      }
+    }
+  });
+
+  it('★ 높이는 100vh 가 아니라 100dvh (PRD §11)', () => {
+    // 모바일 브라우저 주소창 때문에 100vh 는 실제 화면보다 크다
+    for (const file of [...screens, ...collectFiles('app')]) {
+      const code = codeOnly(read(file));
+      for (const cls of ['min-h-screen', 'h-screen', '100vh']) {
+        expect(code, toPosix(file) + ' 에 ' + cls + ' 이 있다').not.toContain(cls);
+      }
+    }
+    // 화면 껍데기는 dvh 를 쓴다
+    expect(read('front/ui/kit.tsx')).toContain('min-h-dvh');
+  });
+
+  it('움직임을 원하지 않는 사용자를 위한 처리가 있다 (PRD §13)', () => {
+    expect(read('app/globals.css')).toContain('prefers-reduced-motion');
+    // 뽑기 연출은 그 설정이면 아예 생략한다 (PRD §6 S4)
+    expect(read('front/screens/DrawScreen.tsx')).toContain('prefers-reduced-motion');
+  });
+
+  it('디자인 토큰 밖의 색을 함부로 만들지 않는다 (PRD §13)', () => {
+    // 목업에 있던 값만 임의 색으로 허용한다. 새 색이 필요하면 먼저 물어본다
+    const allowed = new Set([
+      '#EEF9CE', '#DEF4A0', '#EAF5FF', '#CDE8FF', // 지난 기록 색 농도 (목업 09)
+      '#EDECE5', '#E9E8E1', '#CFCEC6', '#D5D4CC', '#DCEBB2', '#F5D9B8', '#FBFFEF', // 목업 회색·강조
+      '#141A24', '#0E1520', '#242E3C', '#232D3B', '#2E3846', '#1C2431', // 다크 화면 (목업 08)
+      '#93A0B0', '#8B98A8', '#5E6B7C', '#6B7889', '#F2F4F7', // 다크 화면 글자
+      // 아이콘과 브라우저 테마 색은 CSS 토큰을 참조할 수 없어 값으로 적는다.
+      // 셋 다 PRD §13의 --ink / --lime / --paper 와 같은 값이다
+      '#17202E', '#C7F04A', '#FDFCF9',
+    ]);
+    // globals.css 는 토큰을 정의하는 자리다. 거기 적힌 색은 검사 대상이 아니다
+    const used = new Set<string>();
+    for (const file of screens.filter((name) => name.endsWith('.tsx'))) {
+      for (const match of codeOnly(read(file)).matchAll(/#[0-9A-Fa-f]{6}\b/g)) {
+        used.add(match[0].toUpperCase());
+      }
+    }
+    const unknown = [...used].filter((color) => !allowed.has(color));
+    expect(unknown, '목업에 없는 색이 생겼다: ' + unknown.join(', ')).toEqual([]);
+  });
+});
+
 describe('SQL 스키마와 코드가 어긋나지 않는다', () => {
   const sql = read('supabase/migrations/0001_init.sql');
 

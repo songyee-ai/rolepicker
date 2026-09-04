@@ -204,9 +204,14 @@ export default function LandingScreen() {
             </ButtonLink>
           </>
         ) : (
-          <ButtonLink href="/new" tone="lime">
-            새 조 만들기
-          </ButtonLink>
+          <>
+            <ButtonLink href="/new" tone="lime">
+              새 조 만들기
+            </ButtonLink>
+            <ButtonLink href="/guide" tone="quiet" className="mt-[6px]">
+              사용법 자세히 보기
+            </ButtonLink>
+          </>
         )}
       </div>
     </Screen>
