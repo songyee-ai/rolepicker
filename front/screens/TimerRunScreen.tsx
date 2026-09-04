@@ -14,6 +14,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button, ButtonLink, Notice, Screen, TopBar } from '@/front/ui/kit';
 import { api, messageOf } from '@/front/lib/api';
 import { keepScreenAwake, notifyPermission, ring, unlockAudio } from '@/front/lib/alarm';
@@ -46,16 +47,13 @@ const notifyDeniedOnServer = () => false;
 
 type Team = TeamView & { today: AssignmentView };
 
-export default function TimerRunScreen({
-  team,
-  initial,
-}: {
-  team: Team;
-  initial: TimerStateView;
-}) {
+export default function TimerRunScreen({ team, initial }: { team: Team; initial: TimerStateView }) {
+  const router = useRouter();
   const [state, setState] = useState(initial);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  /** 오늘 학습을 끝낼지 묻는 중인가 */
+  const [askingEnd, setAskingEnd] = useState(false);
 
   const advancing = useRef(false);
 
@@ -101,11 +99,7 @@ export default function TimerRunScreen({
    * 그 상태가 유지되는 동안 계속 참인 사실이고, 화면 아래 작은 글씨는
    * 재촉이 아니라 상태 표시로 읽힌다.
    */
-  const notifyDenied = useSyncExternalStore(
-    noSubscribe,
-    notifyDeniedNow,
-    notifyDeniedOnServer,
-  );
+  const notifyDenied = useSyncExternalStore(noSubscribe, notifyDeniedNow, notifyDeniedOnServer);
 
   /** 다른 조원이 넘겼을 수 있다. 화면이 다시 보일 때 조용히 맞춘다 (PRD §14) */
   const refresh = useCallback(async () => {
@@ -219,6 +213,30 @@ export default function TimerRunScreen({
     }
   }
 
+  /**
+   * 오늘 타이머를 닫는다.
+   *
+   * 되돌릴 수 없는 유일한 동작이라 한 번 묻는다 (일시정지는 이어서 하면 되고,
+   * 넘기기는 다음 단계가 이어진다). 누구나 누를 수 있는 것은 다른 조작과 같다 —
+   * 링크를 아는 사람에게 권한 차이를 두지 않는다 (PRD §3-1).
+   *
+   * 지금 세션을 그 자리에서 끝내므로 **실제로 흐른 시간만** 누적에 들어간다.
+   * 그냥 화면을 닫고 나가면 계획한 시간이 통째로 들어간다 — 그게 이 버튼이
+   * 필요한 이유다.
+   */
+  async function endDay() {
+    setError('');
+    setBusy(true);
+    try {
+      if (current) await api.patchTimerSession(team.slug, current.id, 'end');
+      router.push(`/t/${team.slug}`);
+    } catch (caught) {
+      setError(messageOf(caught));
+      setBusy(false);
+      setAskingEnd(false);
+    }
+  }
+
   const keeperName =
     team.today.assigned.find((entry) => entry.role.key === 'keeper')?.member.name ?? null;
   const studySeconds = totalStudySec(state.sessions, now);
@@ -271,7 +289,9 @@ export default function TimerRunScreen({
                   'block h-full transition-[width] duration-300',
                   current.kind === 'study' ? 'bg-sky' : 'bg-lime',
                 ].join(' ')}
-                style={{ width: `${Math.round(progress(current, now) * 100)}%` }}
+                style={{
+                  width: `${Math.round(progress(current, now) * 100)}%`,
+                }}
               />
             </div>
           </>
@@ -346,45 +366,63 @@ export default function TimerRunScreen({
       <Notice>{error}</Notice>
 
       <div className="mt-auto pt-4">
-        {/*
+        {askingEnd ? (
+          <div className="flex flex-col gap-[6px]">
+            <p className="mb-1 text-center text-[11.5px] font-light leading-[1.6] text-[#93A0B0]">
+              오늘 학습을 끝내고 타이머를 닫아요.
+              <br />
+              지금까지{' '}
+              <b className="font-semibold text-[#F2F4F7]">{formatDuration(studySeconds)}</b> 했어요.
+            </p>
+            <Button tone="lime" onClick={endDay} disabled={busy}>
+              {busy ? '끝내는 중이에요…' : '네, 끝낼게요'}
+            </Button>
+            <Button tone="quiet-dark" onClick={() => setAskingEnd(false)} disabled={busy}>
+              그만두기
+            </Button>
+          </div>
+        ) : (
+          <>
+            {/*
           단계를 넘기는 것은 시간지키미의 일이다 (PRD §4). 하지만 이 서비스는
           "이 브라우저가 누구인지" 모른다 — 로그인이 없기 때문이다 (PRD §3-1).
           그래서 버튼을 감추는 대신 이름을 적어 지목한다. 권한이 아니라 신호다.
           누가 눌러도 조 전체가 함께 넘어가고, 그건 의도된 동작이다.
         */}
-        {keeperName ? (
-          <p className="mb-2 text-center text-[10.5px] font-light leading-[1.5] text-[#6B7889]">
-            ⏱️ 시간지키미 <b className="font-semibold text-[#93A0B0]">{keeperName}</b> 그루가
-            넘겨주세요
-          </p>
-        ) : null}
+            {keeperName ? (
+              <p className="mb-2 text-center text-[10.5px] font-light leading-[1.5] text-[#6B7889]">
+                ⏱️ 시간지키미 <b className="font-semibold text-[#93A0B0]">{keeperName}</b> 그루가
+                넘겨주세요
+              </p>
+            ) : null}
 
-        <div className="flex flex-col gap-[6px]">
-          {current ? (
-            <>
-              <Button tone="lime" onClick={skip} disabled={busy}>
-                {nextKind(current.kind) === 'break' ? '쉬는시간으로 넘기기' : '학습으로 넘기기'}
-              </Button>
-              <Button tone="quiet-dark" onClick={togglePause} disabled={busy}>
-                {paused ? '이어서 하기' : '일시정지'}
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button tone="lime" onClick={() => void startNext(waitingKind)} disabled={busy}>
-                {waitingKind === 'break' ? '쉬는시간 시작' : '학습 시작'}
-              </Button>
+            <div className="flex flex-col gap-[6px]">
+              {current ? (
+                <Button tone="lime" onClick={skip} disabled={busy}>
+                  {nextKind(current.kind) === 'break' ? '쉬는시간으로 넘기기' : '학습으로 넘기기'}
+                </Button>
+              ) : (
+                <Button tone="lime" onClick={() => void startNext(waitingKind)} disabled={busy}>
+                  {waitingKind === 'break' ? '쉬는시간 시작' : '학습 시작'}
+                </Button>
+              )}
+
               <ButtonLink href={`/t/${team.slug}/timer?edit=1`} tone="quiet-dark">
                 시간 다시 정하기
               </ButtonLink>
-            </>
-          )}
 
-          {/* 가끔 쓰는 출구. 세 번째 무게로 둔다 */}
-          <ButtonLink href={`/t/${team.slug}`} tone="ghost-dark">
-            오늘의 역할 확인하기
-          </ButtonLink>
-        </div>
+              {/* 하루에 한두 번 쓰는 둘은 한 줄에 나눠 담는다 */}
+              <div className="grid grid-cols-2 gap-[6px]">
+                <Button tone="quiet-dark" onClick={togglePause} disabled={busy || !current}>
+                  {paused ? '이어서 하기' : '일시정지'}
+                </Button>
+                <Button tone="quiet-dark" onClick={() => setAskingEnd(true)} disabled={busy}>
+                  오늘 학습 끝내기
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </Screen>
   );

@@ -290,3 +290,30 @@ export async function loadTimerSummary(assignmentId: string): Promise<TimerSumma
 
   return { kind: active.kind, paused: active.pausedAt !== null };
 }
+
+/**
+ * 바꾼 시간을 지금 돌아가는 세션에도 적용한다.
+ *
+ * "학습 시간을 30분으로 다시 정했는데 화면의 남은 시간이 그대로"면
+ * 안 먹힌 것처럼 보인다. 그래서 진행 중인 세션의 길이도 함께 바꾼다.
+ *
+ * 이미 지난 시간보다 짧게 바꾸면 그 세션은 곧 끝난 것으로 정리된다.
+ * 놀랄 수 있는 동작이라 준비 화면이 미리 알려준다.
+ */
+export async function applyPlanToActive(
+  assignmentId: string,
+  plan: { studySec: number; breakSec: number },
+): Promise<void> {
+  const active = await loadActive(assignmentId);
+  if (!active) return;
+
+  const nextPlanned = active.kind === 'study' ? plan.studySec : plan.breakSec;
+  if (nextPlanned === active.plannedSec) return;
+
+  const { error } = await db()
+    .from('timer_sessions')
+    .update({ planned_sec: nextPlanned })
+    .eq('id', active.id)
+    .is('ended_at', null);
+  if (error) throw error;
+}

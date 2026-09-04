@@ -8,8 +8,9 @@
  *
  * 두 가지 상태가 있다.
  *   (1) 아직 안 켰다 — `시작`을 누르면 약속을 저장하고 학습을 시작한다
- *   (2) 돌아가는 중에 길이를 바꾸러 왔다 (?edit=1) — 지금 세션은 건드리지 않고
- *       다음 단계부터 적용한다. 그래서 버튼 문구도 `시작`이 아니다
+ *   (2) 돌아가는 중에 길이를 바꾸러 왔다 (?edit=1) — 지금 돌아가는 세션에도
+ *       바로 적용한다. 남은 시간이 그대로면 안 먹힌 것처럼 보인다.
+ *       그래서 버튼 문구도 `시작`이 아니라 `지금부터 적용`이다
  */
 
 import { useState } from 'react';
@@ -24,6 +25,7 @@ import {
   BREAK_MIN,
   BREAK_PRESETS,
   clampMinutes,
+  remainingSec,
   LONG_STUDY_MINUTES,
   STEP_MINUTES,
   stepMinutes,
@@ -33,24 +35,28 @@ import {
   STUDY_PRESETS,
   type SessionKind,
 } from '@/shared/timer';
-import type { TeamView, TimerPlan } from '@/shared/types';
+import type { TeamView, TimerStateView } from '@/shared/types';
 
-export default function TimerSetupScreen({
-  team,
-  plan,
-  running,
-}: {
-  team: TeamView;
-  /** 오늘 이미 정해둔 약속이 있으면 그 값에서 시작한다 */
-  plan: TimerPlan | null;
+export default function TimerSetupScreen({ team, state }: { team: TeamView; state: TimerStateView }) {
+  const plan = state.plan;
+  const current = state.current;
   /** 지금 타이머가 돌아가는 중인가 (길이만 바꾸러 온 경우) */
-  running: boolean;
-}) {
+  const running = current !== null;
+
+  /** 지금 단계가 얼마나 지났나. 줄여서 바로 끝나는 경우를 미리 알려주려고 쓴다 */
+  const elapsedMin = current
+    ? Math.floor((current.plannedSec - remainingSec(current, Date.parse(state.serverNow))) / 60)
+    : 0;
   const router = useRouter();
   const [study, setStudy] = useState(plan ? Math.round(plan.studySec / 60) : STUDY_DEFAULT);
   const [rest, setRest] = useState(plan ? Math.round(plan.breakSec / 60) : BREAK_DEFAULT);
   const [error, setError] = useState('');
   const [working, setWorking] = useState(false);
+
+  /** 이미 지난 시간보다 짧게 바꾸려는가 */
+  const shortened =
+    current !== null &&
+    (current.kind === 'study' ? study : rest) * 60 <= current.plannedSec - remainingSec(current, Date.parse(state.serverNow));
 
   // 이 화면에서 기다리는 동안 다른 조원이 켜면 함께 옮겨간다
   useTimerWatch({ slug: team.slug, runningAtLoad: running, enabled: Boolean(team.today) });
@@ -64,7 +70,7 @@ export default function TimerSetupScreen({
 
     try {
       if (running) {
-        // 지금 세션은 그대로 두고 다음 단계부터 적용한다
+        // 지금 돌아가는 세션에도 바로 적용된다
         await api.saveTimerPlan(team.slug, { studySec: study * 60, breakSec: rest * 60 });
       } else {
         /*
@@ -97,7 +103,7 @@ export default function TimerSetupScreen({
       <Title>{running ? '시간 다시 정하기' : '학습 시간 정하기'}</Title>
       <Lede>
         {running
-          ? '지금 돌아가는 시간은 그대로예요. 다음 단계부터 바뀝니다.'
+          ? `지금 ${current.kind === 'study' ? '학습' : '쉬는 시간'}이 ${elapsedMin}분 지났어요. 바꾸면 바로 적용돼요.`
           : '조원과 이야기하고 정해주세요.'}
       </Lede>
 
@@ -147,16 +153,40 @@ export default function TimerSetupScreen({
 
       <div className="mt-auto pt-4">
         {/*
-          버튼 바로 위는 누르기 직전 마지막으로 읽는 자리다. 누가 눌러야 하는지를 적는다.
-          이름을 넣는다 — "시간지키미가 누르세요"는 규칙이고 "김민지 그루가
+          줄이면 이번 단계가 곧바로 끝나는 경우가 있다. 누르기 전에 알려준다.
+          "왜 갑자기 쉬는 시간이 됐지"를 겪게 하면 안 된다 (PRD §17).
+        */}
+        {running && shortened ? (
+          <p className="mb-2 rounded-[10px] bg-warn-bg px-[10px] py-2 text-[11.5px] leading-[1.55] text-warn">
+            이미 {elapsedMin}분 지났어요. {current.kind === 'study' ? study : rest}분으로 줄이면
+            이번 {current.kind === 'study' ? '학습' : '쉬는 시간'}은 바로 끝나요.
+          </p>
+        ) : null}
+
+        {/*
+          버튼 바로 위는 누르기 직전 마지막으로 읽는 자리다.
+          누가 눌러야 하는지를 키컬러 말풍선으로 적어, 누르기 전에 한 번 읽게 한다.
+          이름을 넣는다 — "시간지키미가 누르세요"는 규칙이고 "이하늘 그루가
           누르세요"는 지시다. 화상 통화 중이면 후자가 바로 움직이게 만든다.
         */}
         {!running ? (
-          <FooterNote>
-            {keeper
-              ? `오늘 시간지키미는 ${keeper} 그루예요. 시간을 정하고 눌러주세요.`
-              : '시간을 정하고 눌러주세요.'}
-          </FooterNote>
+          keeper ? (
+            <div className="relative mb-[11px] rounded-[12px] bg-lime px-3 py-[10px] text-center">
+              <p className="text-[10.5px] font-semibold tracking-[0.02em] text-lime-deep/75">
+                ⏱️ 오늘의 시간지키미
+              </p>
+              <p className="mt-[2px] text-[14px] font-bold leading-[1.4] tracking-[-0.02em] text-lime-deep">
+                {keeper} 그루가 눌러주세요
+              </p>
+              {/* 말풍선 꼬리. 바로 아래 버튼을 가리킨다 */}
+              <span
+                aria-hidden
+                className="absolute left-1/2 top-full -ml-[7px] h-0 w-0 border-x-[7px] border-t-[8px] border-x-transparent border-t-lime"
+              />
+            </div>
+          ) : (
+            <FooterNote>시간을 정하고 눌러주세요.</FooterNote>
+          )
         ) : null}
 
         <Button onClick={submit} disabled={working}>
@@ -165,7 +195,7 @@ export default function TimerSetupScreen({
               ? '바꾸는 중이에요…'
               : '시작하고 있어요…'
             : running
-              ? '다음 단계부터 적용'
+              ? '지금부터 적용'
               : '시작'}
         </Button>
       </div>

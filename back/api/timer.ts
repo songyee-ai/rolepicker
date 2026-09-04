@@ -10,6 +10,7 @@ import { ApiError, handler, jsonOk, readJson } from '../errors';
 import { oneOf, optionalInt } from '../validate';
 import { requireTeamBySlug } from '../db/teams';
 import {
+  applyPlanToActive,
   loadTimerState,
   patchSession as patchSessionRow,
   requireAssignmentId,
@@ -59,7 +60,8 @@ export const postSession = handler(async (request: Request, context: SlugContext
   /**
    * kind 가 없으면 약속만 저장한다.
    * 타이머가 돌아가는 중에 `시간 다시 정하기`로 와서 길이를 바꾸는 경우다.
-   * 지금 돌아가는 세션은 건드리지 않고 다음 단계부터 적용된다.
+   * 이때는 지금 돌아가는 세션에도 바로 적용한다 — 남은 시간이 그대로면
+   * 안 먹힌 것처럼 보인다.
    */
   const wantsStart = (body as { kind?: unknown }).kind !== undefined;
   const kind = wantsStart ? oneOf(body, 'kind', KINDS) : null;
@@ -89,6 +91,11 @@ export const postSession = handler(async (request: Request, context: SlugContext
     const isRaceLoser = wantsStart && before.current !== null;
     if (!isRaceLoser) {
       await savePlan(assignmentId, studySec, breakSec);
+      // 일부러 바꾸러 온 경우에는 지금 돌아가는 세션에도 바로 적용한다.
+      // 남은 시간이 그대로면 안 먹힌 것처럼 보인다
+      if (!wantsStart) {
+        await applyPlanToActive(assignmentId, { studySec, breakSec });
+      }
     }
   }
 
