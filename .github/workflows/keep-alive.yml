@@ -1,0 +1,33 @@
+# Supabase 무료 프로젝트는 7일 동안 요청이 없으면 일시 정지된다.
+# 사흘마다 배포된 사이트를 한 번 불러 DB 조회가 일어나게 해서 정지를 막는다.
+#
+# 없는 조 코드로 /api/resolve를 부른다. 형식이 맞는 코드라 DB까지 조회하고
+# 404(없는 조)로 답한다. 404면 DB가 살아 있다는 뜻이고, 5xx면 실패로 표시해
+# GitHub이 메일로 알려 준다. 비밀 키는 필요 없다.
+#
+# 주의: 저장소에 60일 동안 커밋이 없으면 GitHub이 예약 작업을 끈다.
+# 메일이 오면 Actions 탭에서 "Enable workflow"를 누르면 된다.
+
+name: Supabase 깨우기
+
+on:
+  schedule:
+    - cron: '0 0 */3 * *' # 사흘마다 09:00 (한국 시간)
+  workflow_dispatch: # Actions 탭에서 손으로 실행
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: 사이트를 거쳐 DB 조회
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 --retry 3 --retry-delay 20 \
+            'https://rolepicker-pink.vercel.app/api/resolve?code=KEEPALIVE-000000')
+          echo "응답 코드: $code"
+          if [ "$code" != "404" ]; then
+            echo "::error::DB 조회가 404가 아닌 $code 로 끝났다. Supabase 대시보드에서 프로젝트가 정지됐는지 확인할 것."
+            exit 1
+          fi
